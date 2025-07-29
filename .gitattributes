@@ -1,0 +1,1 @@
+snapshots/*.tar.gz.gpg filter=lfs diff=lfs merge=lfs -text
