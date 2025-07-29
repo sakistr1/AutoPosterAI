@@ -1,10 +1,15 @@
+import os
 import stripe
 
 def main():
-    # Σκληροκωδικοποιημένο το secret key από το dashboard σου (sandbox)
-    stripe.api_key = "sk_test_51RnHTuBBE8GGmWkWghyuOEWsVRDU88ejivLLimygROfe8tPA6NPb8ZStMep5CTwZttTAqmdQ7mKa8FyI3ad47bgD00i1r2qqkJ"
+    # Παίρνει το secret key από το περιβάλλον (environment variable)
+    stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-    print("[TEST] Using hardcoded Stripe Secret Key")
+    if not stripe.api_key:
+        print("[ERROR] STRIPE_SECRET_KEY environment variable is not set.")
+        return
+
+    print("[TEST] Using Stripe Secret Key from environment variable.")
 
     try:
         balance = stripe.Balance.retrieve()
