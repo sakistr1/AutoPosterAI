@@ -1,0 +1,17 @@
+import stripe
+
+def main():
+    # Σκληροκωδικοποιημένο το secret key από το dashboard σου (sandbox)
+    stripe.api_key = "sk_test_51RnHTuBBE8GGmWkW07EK6mloqGzVw5N6JCbixKNNXeCmczZcrjqN1LEZ0HAAVQGbc1ayfnxqRe9TE6AAsPreyFIM00CWxA3HH9"
+
+    print("[TEST] Using hardcoded Stripe Secret Key")
+
+    try:
+        balance = stripe.Balance.retrieve()
+        print("[TEST] Stripe balance retrieved successfully!")
+        print(balance)
+    except Exception as e:
+        print(f"[TEST ERROR] Stripe API call failed: {e}")
+
+if __name__ == "__main__":
+    main()
