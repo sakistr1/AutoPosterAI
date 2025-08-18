@@ -14,6 +14,9 @@ from starlette.responses import JSONResponse
 
 import httpx
 
+# ΝΕΟ: ελληνικός renderer
+from production_engine.services.greek_text_renderer import render_image_greek  # <-- προσθήκη
+
 router = APIRouter()
 
 
@@ -46,6 +49,8 @@ class CommitRequest(BaseModel):
 # -----------------------------
 STATIC_ROOT = "production_engine/static"
 GENERATED_DIR = os.path.join(STATIC_ROOT, "generated")
+# ΝΕΟ: Μόνιμη θέση γραμματοσειρών (εκεί που έβαλες τα NotoSans)
+FONTS_DIR = os.path.join("production_engine", "assets", "fonts")  # <-- προσθήκη
 
 os.makedirs(GENERATED_DIR, exist_ok=True)
 
@@ -114,8 +119,7 @@ def _draw_text(draw: ImageDraw.ImageDraw, slot: dict, text: str, font_dir: str):
     color = slot.get("color", "#ffffff")
     bold = slot.get("bold", False)
 
-    # Φόρτωση font με ελληνικά (απλό TTF bundled)
-    # Αν έχεις δικό σου TTF, βάλε στο production_engine/static/fonts/ και άλλαξε path.
+    # Φόρτωση font με ελληνικά (NotoSans στο assets/fonts)
     font_path = os.path.join(font_dir, "NotoSans-Regular.ttf")
     if bold:
         bold_path = os.path.join(font_dir, "NotoSans-Bold.ttf")
@@ -127,29 +131,26 @@ def _draw_text(draw: ImageDraw.ImageDraw, slot: dict, text: str, font_dir: str):
     except Exception:
         font = ImageFont.load_default()
 
-    # απλοϊκό wrapping: κόβουμε ό,τι δεν χωράει σε ύψος, χωρίς multiline layout
-    # (βελτίωση αργότερα)
-    bbox = draw.textbbox((x, y), text, font=font, anchor="lt")
+    # απλό draw (τα slots είναι single-line όπως πριν)
     tx = x
+    anchor = "lt"
     if align == "center":
         tx = x + w // 2
         anchor = "mt"
     elif align == "right":
         tx = x + w
         anchor = "rt"
-    else:
-        anchor = "lt"
     draw.text((tx, y), text, font=font, fill=color, anchor=anchor)
 
 
 # -----------------------------
 # Routes
 # -----------------------------
-@router.post("/render")
+@router.post("/previews/render")
 def render_image(payload: RenderRequest):
     """
     Αν υπάρχει template_id + spec: slot-based render.
-    Αλλιώς: απλό compose (logo πάνω αριστερά + μέχρι 2 έξτρα εικόνες).
+    Αλλιώς: απλό compose (logo πάνω αριστερά + μέχρι 2 έξτρα εικόνες) -> (τροποποιήθηκε να καλεί ελληνικό renderer).
     Επιστρέφει path για την παραγόμενη εικόνα + preview_id.
     """
     canvas_w, canvas_h = 1080, 1080
@@ -171,7 +172,8 @@ def render_image(payload: RenderRequest):
                 pass
 
         # slots
-        font_dir = os.path.join(STATIC_ROOT, "fonts")
+        # ΠΡΙΝ: font_dir = os.path.join(STATIC_ROOT, "fonts")
+        font_dir = FONTS_DIR  # <-- Χρήση assets/fonts για ελληνικά
         draw = ImageDraw.Draw(base)
         extra_map = {}
         # source: "extra1"/"extra2"...
@@ -203,32 +205,29 @@ def render_image(payload: RenderRequest):
                     val = str(payload.text_fields.get(text_key, "") or "")
                 _draw_text(draw, slot, val, font_dir)
     else:
-        # simple compose
-        draw = ImageDraw.Draw(base)
-        if payload.brand_logo_url:
-            try:
-                logo = _open_image_from_static(payload.brand_logo_url)
-                logo_slot = {"x": 24, "y": 24, "w": 280, "h": 140, "fit": "contain"}
-                piece = _paste_fit(logo, logo_slot)
-                base.alpha_composite(piece, (logo_slot["x"], logo_slot["y"]))
-            except Exception:
-                pass
+        # simple compose -> Χρήση ελληνικού renderer με pixel-wrap
+        text = (payload.text_fields or {}) if isinstance(payload.text_fields, dict) else {}
+        title = str(text.get("title") or (f"Προϊόν #{payload.product_id}" if payload.product_id else "Promo"))
+        price = str(text.get("price") or "")
+        cta   = str(text.get("cta")   or "Αγόρασε τώρα")
 
-        for i, path in enumerate(payload.extra_images[:2]):
-            try:
-                img = _open_image_from_static(path)
-                slot = {"x": 60 + i * 520, "y": 240, "w": 480, "h": 480, "fit": "contain"}
-                piece = _paste_fit(img, slot)
-                base.alpha_composite(piece, (slot["x"], slot["y"]))
-            except Exception:
-                continue
+        # brand_logo_url -> filesystem path αν είναι /static/...
+        brand_logo_path = None
+        if payload.brand_logo_url and isinstance(payload.brand_logo_url, str) and payload.brand_logo_url.startswith("/static/"):
+            rel = payload.brand_logo_url[len("/static/"):]  # π.χ. uploads/brand/logo.png
+            brand_logo_path = os.path.join(STATIC_ROOT, rel)
 
-        # basic texts
-        if payload.text_fields:
-            font_dir = os.path.join(STATIC_ROOT, "fonts")
-            _draw_text(draw, {"x": 60, "y": 760, "w": 960, "h": 80, "font_size": 46, "align": "left", "color": "#ffffff"}, str(payload.text_fields.get("title", "")), font_dir)
-            _draw_text(draw, {"x": 60, "y": 840, "w": 960, "h": 80, "font_size": 54, "align": "left", "color": "#22c55e"}, str(payload.text_fields.get("price", "")), font_dir)
-            _draw_text(draw, {"x": 60, "y": 920, "w": 960, "h": 80, "font_size": 36, "align": "left", "color": "#e5e7eb"}, str(payload.text_fields.get("cta", "")), font_dir)
+        # Ρεντάρουμε προσωρινό PNG και το χρησιμοποιούμε ως base
+        tmp_name = f"tmp_{int(datetime.utcnow().timestamp()*1000)}.png"
+        tmp_path = os.path.join(GENERATED_DIR, tmp_name)
+        render_image_greek(
+            tmp_path,
+            title=title,
+            price=price,
+            cta=cta,
+            brand_logo_path=brand_logo_path
+        )
+        base = Image.open(tmp_path).convert("RGBA")
 
     # save
     preview_id = f"prev_{int(datetime.utcnow().timestamp()*1000)}"
@@ -288,7 +287,7 @@ async def debit_one_credit(authorization: Optional[str]) -> None:
 # -----------------------------
 # Commit + History
 # -----------------------------
-@router.post("/commit")
+@router.post("/previews/commit")
 async def commit_preview(
     payload: CommitRequest,
     authorization: Optional[str] = Header(default=None, alias="Authorization")
@@ -313,7 +312,7 @@ async def commit_preview(
     return {"post_id": int(new_id), "preview_id": payload.preview_id, "urls": payload.urls, "created_at": now.isoformat() + "Z"}
 
 
-@router.get("/committed")
+@router.get("/previews/committed")
 def list_committed(limit: int = 20, offset: int = 0):
     """
     Επιστρέφει πρόσφατα commits με basic pagination.

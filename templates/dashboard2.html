@@ -43,6 +43,7 @@
     .spacer{height:8px}
     .product-actions .btn{width:100%}
     .product-card .muted.small{display:block;margin-top:4px}
+    .product-thumb{width:100%;height:auto;border:1px solid var(--border);border-radius:8px;background:#0b1020;margin-bottom:6px}
     @media (max-width: 980px){ .row,.row-3,.preview,.grid{grid-template-columns:1fr} }
   </style>
 </head>
@@ -70,7 +71,7 @@
       <div class="row">
         <div class="card">
           <h2>Λίστα Templates</h2>
-          <div class="muted small">MVP: manual λίστα για αρχή. Μετά DB + mapping.</div>
+          <div class="muted small">MVP: manual λίστα για αρχή. Μετά θα φορτώνουμε από DB + mapping.</div>
           <div class="spacer"></div>
           <div class="grid" id="templatesGrid"></div>
         </div>
@@ -142,42 +143,11 @@
 
     <div class="tab-content" id="tab-products" style="display:none">
       <div class="card">
-        <h2>Προϊόντα (MVP)</h2>
-        <div class="muted small">Επιλέγεις κάρτα ή πατάς «Δημιουργία Εικόνας» για preview.</div>
+        <h2>Προϊόντα</h2>
+        <div class="muted small">Γεμίζει από <code>/me/products</code>. Αν λείπει token ή αποτύχει, θα δεις demo.</div>
         <div class="spacer"></div>
         <div class="grid" id="productsGrid">
-          <div class="product-card" data-id="101">
-            <strong>#101</strong><br>
-            <span class="muted small">Demo Product</span>
-            <div class="spacer"></div>
-            <div class="actions product-actions">
-              <button class="btn btn-primary btn-create-image" data-id="101">Δημιουργία Εικόνας</button>
-            </div>
-          </div>
-          <div class="product-card" data-id="102">
-            <strong>#102</strong><br>
-            <span class="muted small">Demo Product</span>
-            <div class="spacer"></div>
-            <div class="actions product-actions">
-              <button class="btn btn-primary btn-create-image" data-id="102">Δημιουργία Εικόνας</button>
-            </div>
-          </div>
-          <div class="product-card" data-id="103">
-            <strong>#103</strong><br>
-            <span class="muted small">Demo Product</span>
-            <div class="spacer"></div>
-            <div class="actions product-actions">
-              <button class="btn btn-primary btn-create-image" data-id="103">Δημιουργία Εικόνας</button>
-            </div>
-          </div>
-          <div class="product-card" data-id="104">
-            <strong>#104</strong><br>
-            <span class="muted small">Demo Product</span>
-            <div class="spacer"></div>
-            <div class="actions product-actions">
-              <button class="btn btn-primary btn-create-image" data-id="104">Δημιουργία Εικόνας</button>
-            </div>
-          </div>
+          <div class="muted">Φόρτωση…</div>
         </div>
       </div>
     </div>
@@ -240,6 +210,7 @@
       $$('.tab-content').forEach(c => c.style.display = 'none');
       el('tab-' + name).style.display = '';
       if (name === 'previews') refreshCommitted();
+      if (name === 'products') loadProducts();
     }));
 
     // ---- Templates (MVP: manual list) ----
@@ -271,18 +242,6 @@
       });
     }
     renderTemplates();
-
-    // ---- Products selection (γεμίζει και το input) ----
-    $$('#productsGrid .product-card').forEach(card => {
-      card.addEventListener('click', () => {
-        $$('#productsGrid .product-card').forEach(x => x.classList.remove('active'));
-        card.classList.add('active');
-        const id = parseInt(card.dataset.id, 10);
-        state.selectedProductId = id;
-        el('productId').value = id;
-        setStatus(`Επιλέχθηκε προϊόν #${id}`, 'ok');
-      });
-    });
 
     // ---- Upload handlers ----
     async function uploadSingle(endpoint, file) {
@@ -369,7 +328,7 @@
         const data = await res.json();
         appendPreviewResult(data);
         setStatus('OK', 'ok');
-        refreshCredits(); // keep badge fresh
+        refreshCredits();
       } catch (err) {
         console.error(err);
         setStatus('Απέτυχε το preview: ' + err.message, 'err');
@@ -417,7 +376,6 @@
       const grid = el('previewGrid');
       if (state.previews.length === 0) grid.innerHTML = '';
 
-      // sanitize urls
       let urls = Array.isArray(data.urls) ? data.urls.filter(u => !isPlaceholderUrl(u)) : [];
       const hadInvalid = (Array.isArray(data.urls) && urls.length !== data.urls.length);
 
@@ -555,15 +513,102 @@
       refreshCredits();
     }
 
+    // ---- Προϊόντα από backend ----
+    const demoProducts = [
+      { id: 101, name: 'Demo Product 101' },
+      { id: 102, name: 'Demo Product 102' },
+      { id: 103, name: 'Demo Product 103' },
+      { id: 104, name: 'Demo Product 104' },
+    ];
+
+    function productThumbOf(p){
+      return p.image_url || p.image || p.thumbnail_url || p.thumb_url || '';
+    }
+
+    function renderProducts(products){
+      const grid = el('productsGrid');
+      grid.innerHTML = '';
+      if (!Array.isArray(products) || !products.length){
+        grid.innerHTML = '<div class="muted">Κανένα προϊόν.</div>';
+        return;
+      }
+      products.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'product-card';
+        card.dataset.id = p.id;
+
+        const name = p.name || p.title || ('Product ' + p.id);
+        const img = productThumbOf(p);
+
+        card.innerHTML = `
+          ${img ? `<img class="product-thumb" src="${img}" alt="${name}">` : ''}
+          <strong>#${p.id}</strong><br>
+          <span class="muted small">${name}</span>
+          <div class="spacer"></div>
+          <div class="actions product-actions">
+            <button class="btn btn-primary btn-create-image" data-id="${p.id}">Δημιουργία Εικόνας</button>
+          </div>
+        `;
+
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.btn-create-image')) return;
+          $$('#productsGrid .product-card').forEach(x => x.classList.remove('active'));
+          card.classList.add('active');
+          state.selectedProductId = p.id;
+          el('productId').value = p.id;
+          setStatus(`Επιλέχθηκε προϊόν #${p.id}`, 'ok');
+        });
+
+        grid.appendChild(card);
+      });
+
+      // bind buttons
+      $$('.btn-create-image', el('productsGrid')).forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const pid = btn.dataset.id;
+          if (!pid){ alert('Άγνωστο Product ID'); return; }
+          el('productId').value = pid;     // sync και με τα υπόλοιπα
+          await createImagePreview(pid, btn);
+        });
+      });
+    }
+
+    async function loadProducts(){
+      const grid = el('productsGrid');
+      grid.innerHTML = '<div class="muted">Φόρτωση…</div>';
+      const t = getToken();
+      if (!t){
+        grid.innerHTML = '<div class="err small">Δεν υπάρχει token. Πάτα "Set Token".</div>';
+        renderProducts(demoProducts);
+        return;
+      }
+      try{
+        const res = await fetch('/me/products', { headers: { Authorization: 'Bearer ' + t } });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (Array.isArray(data.items) ? data.items : []);
+        if (!list.length){
+          grid.innerHTML = '<div class="warn small">Μηδενικά προϊόντα από backend. Δείχνω demo.</div>';
+          renderProducts(demoProducts);
+        } else {
+          renderProducts(list);
+        }
+      }catch(err){
+        grid.innerHTML = `<div class="err small">Αποτυχία φόρτωσης προϊόντων (${err.message}). Δείχνω demo.</div>`;
+        renderProducts(demoProducts);
+      }
+    }
+
     // ---- Δημιουργία Preview από κάρτα προϊόντος (Engine flow) ----
     async function createImagePreview(productId, btn){
       const originalText = btn.textContent;
       btn.disabled = true;
       btn.textContent = 'Δημιουργία preview…';
       try{
-        el('productId').value = productId;           // συγχρονίζουμε input
-        el('postType').value = 'image';              // εξαναγκάζουμε image
-        await doRender();                            // free render
+        el('productId').value = productId;
+        el('postType').value = 'image';
+        await doRender();
       } finally {
         btn.disabled = false;
         btn.textContent = originalText;
@@ -580,22 +625,21 @@
       localStorage.setItem('token', val.trim());
       updateTokenState();
       refreshCredits();
-    });
-
-    // Listeners για «Δημιουργία Εικόνας» στις κάρτες
-    $$('.btn-create-image').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const pid = btn.dataset.id;
-        if (!pid){ alert('Άγνωστο Product ID'); return; }
-        createImagePreview(pid, btn);
-      });
+      // μόλις μπήκε token, φόρτωσε προϊόντα
+      loadProducts();
     });
 
     // αρχικοποίηση
     updateTokenState();
     refreshCredits();
     refreshCommitted();
+    loadProducts();
+
+    // auto-refresh κάθε 30s για credits & history (όχι products για να μην ενοχλεί)
+    setInterval(() => {
+      refreshCredits();
+      if ($('.tab.active')?.dataset.tab === 'previews') refreshCommitted();
+    }, 30000);
   </script>
 </body>
 </html>

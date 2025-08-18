@@ -38,10 +38,10 @@ app.include_router(users.router, prefix="/users")
 app.include_router(auth.router, prefix="/auth")
 app.include_router(me.router, prefix="/me")
 app.include_router(dashboard.router, prefix="/dashboard")
-app.include_router(templates.router, prefix="/templates")
+app.include_router(templates.router)
 
 # Routers (production_engine + assets)
-app.include_router(previews.router, prefix="/previews")
+app.include_router(previews.router)
 app.include_router(_assets_module.router, prefix="/assets")
 app.include_router(tengine.router)  # ✅ ΠΡΟΣΘΗΚΗ
 
