@@ -10,8 +10,9 @@
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;color:var(--text);background:linear-gradient(180deg,var(--bg),var(--bg2))}
     header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);background:#0b1220;position:sticky;top:0;z-index:10}
     header h1{font-size:18px;margin:0}
-    .tags{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-    .tag{display:inline-block;background:#0b1020;border:1px solid var(--border);color:#cbd5e1;padding:4px 8px;border-radius:999px;font-size:12px}
+    .tags{display:flex;gap:8px;flex-wrap:wrap}
+    .tag{display:inline-flex;align-items:center;gap:6px;background:#0b1020;border:1px solid var(--border);color:#cbd5e1;padding:4px 10px;border-radius:999px;font-size:12px;cursor:default}
+    .tag.button{cursor:pointer}
     .wrap{max-width:1200px;margin:24px auto;padding:0 16px}
     .tabs{display:flex;gap:6px;border-bottom:1px solid var(--border)}
     .tab{padding:10px 14px;border:1px solid var(--border);border-bottom:none;border-radius:12px 12px 0 0;background:#0b1020;color:#cbd5e1;cursor:pointer}
@@ -22,16 +23,15 @@
     .card{background:#0b1020;border:1px solid var(--border);border-radius:14px;padding:14px}
     h2{font-size:16px;margin:0 0 10px}
     label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
-    input,select,button,textarea{width:100%;background:#070d1a;border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:10px}
+    input,select,button,textarea{width:100%;background:#070d1a;border:1px solid var(--border);color:#var(--text);padding:10px 12px;border-radius:10px}
     input:focus,select:focus,textarea:focus{outline:none;border-color:#334155}
     .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:10px;border:1px solid var(--border);padding:10px 14px;cursor:pointer;background:#0c1327}
     .btn-primary{background:var(--accent);border-color:transparent;color:#0b1220;font-weight:600}
     .btn-alt{background:#0c1633}
     .btn-danger{background:#1b0b0b;border-color:#3b0c0c;color:#fca5a5}
     .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-    .template-card,.product-card{border:1px solid var(--border);border-radius:12px;padding:10px;background:#0b1020;cursor:pointer;transition:border-color .08s ease, box-shadow .08s ease}
+    .template-card,.product-card{border:1px solid var(--border);border-radius:12px;padding:10px;background:#0b1020;cursor:pointer}
     .template-card.active,.product-card.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(34,197,94,.2) inset}
-    .template-thumb{width:100%;border-radius:10px;border:1px solid var(--border);background:#0b1020;aspect-ratio:4/5;object-fit:cover;margin-bottom:8px}
     .muted{color:var(--muted);font-size:13px}
     .small{font-size:12px;color:#94a3b8}
     .hint{display:block;margin-top:4px;font-size:12px;color:#9ca3af}
@@ -41,14 +41,9 @@
     .status{margin-top:8px;font-size:12px}
     .ok{color:#86efac}.warn{color:#facc15}.err{color:#fca5a5}
     .spacer{height:8px}
+    .product-actions .btn{width:100%}
+    .product-card .muted.small{display:block;margin-top:4px}
     @media (max-width: 980px){ .row,.row-3,.preview,.grid{grid-template-columns:1fr} }
-
-    /* preview cards with commit */
-    .preview-card{border:1px solid var(--border);border-radius:12px;padding:10px;background:#0b1020}
-    .preview-card .thumb{width:100%;border-radius:10px;border:1px solid var(--border);background:#0b1020}
-    .preview-meta{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
-    .badge{font-size:11px;border:1px solid var(--border);padding:2px 6px;border-radius:999px;color:#cbd5e1}
-    .badge.ok{border-color:#14532d;color:#86efac}
   </style>
 </head>
 <body>
@@ -58,8 +53,9 @@
       <span class="tag">Preview = Free</span>
       <span class="tag">Commit = −1 credit</span>
       <span class="tag">Απομονωμένο subsystem</span>
-      <button class="tag" id="btnSetToken">Set Token</button>
+      <span class="tag button" id="btnSetToken">Set Token</span>
       <span class="tag" id="tokenState">No token</span>
+      <span class="tag" id="creditsBadge">Credits: —</span>
     </div>
   </header>
 
@@ -74,20 +70,13 @@
       <div class="row">
         <div class="card">
           <h2>Λίστα Templates</h2>
-          <div class="muted small">Φορτώνονται από <code>/tengine/templates</code>. Κλικ για επιλογή.</div>
+          <div class="muted small">MVP: manual λίστα για αρχή. Μετά DB + mapping.</div>
           <div class="spacer"></div>
-          <div class="actions" style="margin-bottom:8px">
-            <button class="btn btn-alt" id="btnReloadTemplates">Reload</button>
-          </div>
-          <div class="grid" id="templatesGrid">
-            <!-- γεμίζει από JS -->
-          </div>
+          <div class="grid" id="templatesGrid"></div>
         </div>
 
         <div class="card">
           <h2>Επιλογές Render</h2>
-
-          <!-- 1η σειρά επιλογών -->
           <div class="row-3">
             <div>
               <label for="postType">Τύπος Post</label>
@@ -113,24 +102,23 @@
             </div>
           </div>
 
-          <!-- 2η σειρά: Uploads -->
           <div class="spacer"></div>
           <div class="row-3">
             <div>
               <label for="brandLogo">Λογότυπο <span class="small">*</span></label>
               <input type="file" id="brandLogo" accept=".png,.jpg,.jpeg,.svg" />
-              <span class="hint">* Προαιρετικό. Προτιμήστε SVG ή PNG με διαφάνεια, ≥512×512.</span>
+              <span class="hint">* Προαιρετικό. SVG/PNG με διαφάνεια.</span>
               <div id="brandLogoPreview" class="small muted" style="margin-top:6px;"></div>
             </div>
             <div>
               <label for="extraImages">Extra φωτογραφίες <span class="small">*</span></label>
               <input type="file" id="extraImages" accept=".png,.jpg,.jpeg,.webp" multiple />
-              <span class="hint">* Προαιρετικό. 2–4 εικόνες, ≥1200px, λόγοι 1:1 / 4:5 / 9:16.</span>
+              <span class="hint">* 2–4 εικόνες, ≥1200px.</span>
               <div id="extraImagesPreview" class="small muted" style="margin-top:6px;"></div>
             </div>
             <div>
               <label>&nbsp;</label>
-              <div class="small muted">Ανέβασε brand logo & extra photos για πιο επαγγελματικό αποτέλεσμα.</div>
+              <div class="small muted">Προαιρετικά για καλύτερο αποτέλεσμα.</div>
             </div>
           </div>
 
@@ -146,7 +134,7 @@
       <div class="spacer"></div>
       <div class="card">
         <h2>Αποτελέσματα</h2>
-        <div id="previewGrid" class="grid">
+        <div id="previewGrid" class="preview">
           <div class="muted">Κανένα preview ακόμα.</div>
         </div>
       </div>
@@ -155,36 +143,51 @@
     <div class="tab-content" id="tab-products" style="display:none">
       <div class="card">
         <h2>Προϊόντα (MVP)</h2>
-        <div class="muted small">Σε αυτή την έκδοση βάζεις manual το Product ID. Μετά θα φέρνουμε λίστα από το υπάρχον backend.</div>
+        <div class="muted small">Επιλέγεις κάρτα ή πατάς «Δημιουργία Εικόνας» για preview.</div>
         <div class="spacer"></div>
         <div class="grid" id="productsGrid">
-          <!-- Προαιρετικό mock — συμπλήρωσε IDs σου -->
-          <div class="product-card" data-id="101"><strong>#101</strong><br><span class="muted small">Demo Product</span></div>
-          <div class="product-card" data-id="102"><strong>#102</strong><br><span class="muted small">Demo Product</span></div>
-          <div class="product-card" data-id="103"><strong>#103</strong><br><span class="muted small">Demo Product</span></div>
-          <div class="product-card" data-id="104"><strong>#104</strong><br><span class="muted small">Demo Product</span></div>
+          <div class="product-card" data-id="101">
+            <strong>#101</strong><br>
+            <span class="muted small">Demo Product</span>
+            <div class="spacer"></div>
+            <div class="actions product-actions">
+              <button class="btn btn-primary btn-create-image" data-id="101">Δημιουργία Εικόνας</button>
+            </div>
+          </div>
+          <div class="product-card" data-id="102">
+            <strong>#102</strong><br>
+            <span class="muted small">Demo Product</span>
+            <div class="spacer"></div>
+            <div class="actions product-actions">
+              <button class="btn btn-primary btn-create-image" data-id="102">Δημιουργία Εικόνας</button>
+            </div>
+          </div>
+          <div class="product-card" data-id="103">
+            <strong>#103</strong><br>
+            <span class="muted small">Demo Product</span>
+            <div class="spacer"></div>
+            <div class="actions product-actions">
+              <button class="btn btn-primary btn-create-image" data-id="103">Δημιουργία Εικόνας</button>
+            </div>
+          </div>
+          <div class="product-card" data-id="104">
+            <strong>#104</strong><br>
+            <span class="muted small">Demo Product</span>
+            <div class="spacer"></div>
+            <div class="actions product-actions">
+              <button class="btn btn-primary btn-create-image" data-id="104">Δημιουργία Εικόνας</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="tab-content" id="tab-previews" style="display:none">
       <div class="card">
-        <h2>Ιστορικό Previews (Session)</h2>
-        <div class="muted small">Τοπική λίστα από αυτή τη σελίδα.</div>
+        <h2>Ιστορικό (DB)</h2>
+        <div class="muted small">Committed posts από τη βάση.</div>
         <div class="spacer"></div>
         <div id="history" class="preview">
-          <div class="muted">Κενό.</div>
-        </div>
-      </div>
-
-      <div class="spacer"></div>
-      <div class="card">
-        <h2>Committed (DB)</h2>
-        <div class="actions" style="margin-bottom:8px">
-          <button class="btn btn-primary" id="btnRefreshCommitted">Ανανέωση</button>
-          <span class="small muted">GET /previews/committed</span>
-        </div>
-        <div id="committedGrid" class="grid">
           <div class="muted">Κενό.</div>
         </div>
       </div>
@@ -196,7 +199,7 @@
     const state = {
       selectedTemplateId: null,
       selectedProductId: null,
-      previews: [], // {preview_id, url, committed:boolean}
+      previews: [],
       brandLogoUrl: null,
       extraImageUrls: [],
     };
@@ -207,12 +210,26 @@
     const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
     const setStatus = (msg, cls='muted') => { const s = el('status'); s.className = 'status ' + cls; s.textContent = msg; };
 
-    function getToken(){
-      return localStorage.getItem('token') || '';
-    }
+    const getToken = () => localStorage.getItem('token') || '';
     function updateTokenState(){
       const t = getToken();
-      el('tokenState').textContent = t ? 'Token: SET' : 'No token';
+      const s = el('tokenState');
+      if (s) s.textContent = t ? 'Token: set' : 'No token';
+    }
+    async function refreshCredits(){
+      const badge = el('creditsBadge');
+      const t = getToken();
+      if (!badge) return;
+      if (!t){ badge.textContent = 'Credits: —'; return; }
+      try{
+        const res = await fetch('/me/credits', { headers: { Authorization: 'Bearer ' + t } });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        const n = (data && typeof data.credits === 'number') ? data.credits : '?';
+        badge.textContent = 'Credits: ' + n;
+      }catch(_){
+        badge.textContent = 'Credits: ?';
+      }
     }
 
     // ---- Tabs ----
@@ -222,78 +239,40 @@
       const name = t.dataset.tab;
       $$('.tab-content').forEach(c => c.style.display = 'none');
       el('tab-' + name).style.display = '';
+      if (name === 'previews') refreshCommitted();
     }));
 
-    // ---- Token set ----
-    el('btnSetToken').addEventListener('click', () => {
-      const val = prompt('Δώσε JWT token (μόνο το token, χωρίς "Bearer ")');
-      if (!val) return;
-      localStorage.setItem('token', val.trim());
-      updateTokenState();
-    });
-    updateTokenState();
+    // ---- Templates (MVP: manual list) ----
+    const templates = [
+      { id: 1, name: 'img_product_clean', type: 'image', ratio: '1:1' },
+      { id: 2, name: 'img_lifestyle_hint', type: 'image', ratio: '4:5' },
+      { id: 3, name: 'img_discount_card', type: 'image', ratio: '1:1' },
+      { id: 4, name: 'car_features_steps', type: 'carousel', ratio: '1:1' },
+      { id: 5, name: 'car_multi_grid', type: 'carousel', ratio: '4:5' },
+      { id: 6, name: 'vid_slideshow_overlay', type: 'video', ratio: '9:16' },
+    ];
 
-    // ---- Templates: load από backend ----
     const templatesGrid = el('templatesGrid');
-
-    function renderTemplates(list){
+    function renderTemplates() {
       templatesGrid.innerHTML = '';
-      if (!Array.isArray(list) || list.length === 0){
-        templatesGrid.innerHTML = '<div class="muted small">No templates</div>';
-        return;
-      }
-      list.forEach(t => {
+      templates.forEach(t => {
         const div = document.createElement('div');
         div.className = 'template-card';
         div.dataset.id = t.id;
-
-        const img = document.createElement('img');
-        img.className = 'template-thumb';
-        img.alt = t.name || '';
-        img.src = t.thumb_url || 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="500"><rect width="100%" height="100%" fill="#0f172a"/><text x="50%" y="50%" fill="#94a3b8" font-size="24" text-anchor="middle" dominant-baseline="middle">No Thumb</text></svg>`);
-
-        const meta = document.createElement('div');
-        meta.innerHTML = `<strong>#${t.id} ${t.name||''}</strong><br><span class="muted small">${(t.type||'').toUpperCase()}${t.ratio?(' • '+t.ratio):''}</span>`;
-
-        div.appendChild(img);
-        div.appendChild(meta);
-
+        div.innerHTML = `<strong>#${t.id} ${t.name}</strong><br><span class="muted small">${t.type.toUpperCase()} • ${t.ratio}</span>`;
         div.addEventListener('click', () => {
           $$('.template-card').forEach(x => x.classList.remove('active'));
           div.classList.add('active');
           state.selectedTemplateId = t.id;
-          // auto set τύπος post
-          if (t.type === 'carousel') el('postType').value = 'carousel';
-          else if (t.type === 'video') el('postType').value = 'video';
-          else el('postType').value = 'image';
           setStatus(`Επιλέχθηκε template #${t.id}`, 'ok');
+          el('postType').value = (t.type === 'carousel') ? 'carousel' : (t.type === 'video' ? 'video' : 'image');
         });
-
         templatesGrid.appendChild(div);
       });
-
-      // default: select first
-      const first = templatesGrid.querySelector('.template-card');
-      if (first && !state.selectedTemplateId) {
-        first.click();
-      }
     }
+    renderTemplates();
 
-    async function loadTemplates(){
-      try{
-        const res = await fetch('/tengine/templates');
-        if(!res.ok) throw new Error('HTTP '+res.status);
-        const data = await res.json();
-        renderTemplates(data);
-      }catch(err){
-        templatesGrid.innerHTML = `<div class="muted small">Load failed: ${err.message}</div>`;
-      }
-    }
-
-    el('btnReloadTemplates').addEventListener('click', loadTemplates);
-    loadTemplates();
-
-    // ---- Products mock click → γεμίζει το input ----
+    // ---- Products selection (γεμίζει και το input) ----
     $$('#productsGrid .product-card').forEach(card => {
       card.addEventListener('click', () => {
         $$('#productsGrid .product-card').forEach(x => x.classList.remove('active'));
@@ -360,12 +339,17 @@
       }
     });
 
-    // ---- Preview render (με backend απόκριση: preview_url) ----
+    // ---- Preview render ----
+    function isPlaceholderUrl(u){
+      const s = String(u || '');
+      return s.includes('<') || s.includes('>') || s.includes('%3C') || s.includes('%3E') || s.includes('from_render');
+    }
+
     async function doRender() {
-      const template_id = state.selectedTemplateId;
+      const template_id = state.selectedTemplateId || 1;
       const product_id = el('productId').value ? parseInt(el('productId').value, 10) : null;
-      const post_type = el('postType').value;
-      const mode = el('mode').value;
+      const post_type = el('postType').value || 'image';
+      const mode = el('mode').value || 'Κανονικό';
 
       if (!template_id) { setStatus('Διάλεξε template.', 'warn'); return; }
       if (!post_type) { setStatus('Διάλεξε τύπο post.', 'warn'); return; }
@@ -383,153 +367,175 @@
         });
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
-        const preview = {
-          preview_id: data.preview_id,
-          url: data.preview_url ? data.preview_url : (Array.isArray(data.urls) ? data.urls[0] : null),
-          committed: false,
-        };
-        appendPreviewResult(preview);
-        state.previews.push(preview);
+        appendPreviewResult(data);
         setStatus('OK', 'ok');
+        refreshCredits(); // keep badge fresh
       } catch (err) {
         console.error(err);
         setStatus('Απέτυχε το preview: ' + err.message, 'err');
       }
     }
 
-    function previewCard(preview){
-      const card = document.createElement('div');
-      card.className = 'preview-card';
-      const media = document.createElement(preview.url && preview.url.endsWith('.mp4') ? 'video' : 'img');
-      media.className = 'thumb';
-      if (media.tagName.toLowerCase()==='video'){
-        media.src = preview.url; media.controls = true; media.playsInline = true;
-      } else {
-        media.src = preview.url; media.loading = 'lazy';
-      }
-
-      const meta = document.createElement('div');
-      meta.className = 'preview-meta';
-      const left = document.createElement('div');
-      left.className = 'small muted';
-      left.textContent = `preview_id: ${preview.preview_id}`;
-      const right = document.createElement('div');
-      const btn = document.createElement('button');
-      btn.className = 'btn btn-primary';
-      btn.textContent = preview.committed ? 'Committed' : 'Commit (−1 credit)';
-      btn.disabled = preview.committed;
-      btn.addEventListener('click', () => commitPreview(preview, btn));
-      right.appendChild(btn);
-
-      meta.appendChild(left);
-      meta.appendChild(right);
-
-      if (preview.committed){
-        const badge = document.createElement('span');
-        badge.className = 'badge ok';
-        badge.textContent = 'DB saved';
-        left.appendChild(document.createTextNode(' '));
-        left.appendChild(badge);
-      }
-
-      card.appendChild(media);
-      card.appendChild(meta);
-      return card;
-    }
-
-    function appendPreviewResult(preview) {
-      const grid = el('previewGrid');
-      if (state.previews.length === 0) grid.innerHTML = '';
-      grid.prepend(previewCard(preview)); // νέο πρώτο
-      // Session history (tab Previews)
-      const hist = el('history');
-      if (state.previews.length === 0) hist.innerHTML = '';
-      const item = document.createElement('div');
-      item.className = 'card';
-      item.innerHTML = `
-        <div class="small muted">preview_id: ${preview.preview_id}</div>
-        <div class="small">${preview.url ? 1 : 0} αρχεία</div>
-      `;
-      hist.prepend(item);
-    }
-
     // ---- Commit (−1 credit) ----
     async function commitPreview(preview, btn){
-      const token = getToken();
-      if (!token){
-        alert('Βάλε token (πάνω δεξιά Set Token) για να γίνει commit.');
-        return;
-      }
-      if (!preview.url){
-        alert('Λείπει url από το preview.');
-        return;
-      }
+      const t = getToken();
+      if (!t){ alert('Βάλε token (Set Token) πριν το commit.'); return; }
       btn.disabled = true;
-      btn.textContent = 'Committing...';
+      btn.textContent = 'Committing…';
       try{
         const res = await fetch('/previews/commit', {
           method: 'POST',
           headers: {
             'Content-Type':'application/json',
-            'Authorization': 'Bearer ' + token
+            'Authorization': 'Bearer ' + t
           },
-          body: JSON.stringify({
-            preview_id: preview.preview_id,
-            urls: [preview.url]
-          })
+          body: JSON.stringify({ preview_id: preview.preview_id, urls: preview.urls || [] })
         });
         if (!res.ok){
-          const t = await res.text();
-          throw new Error(t || ('HTTP '+res.status));
+          if (res.status === 402){
+            alert('Αποτυχία commit: Δεν έχεις credits.');
+            btn.disabled = false;
+            btn.textContent = 'Commit (−1 credit)';
+            await refreshCredits();
+            return;
+          }
+          const text = await res.text();
+          throw new Error(text || ('HTTP ' + res.status));
         }
-        preview.committed = true;
         btn.textContent = 'Committed';
-        // Προαιρετικά, ανανέωση DB history
+        btn.disabled = true;
         await refreshCommitted();
+        await refreshCredits();
       }catch(err){
+        alert('Απέτυχε: ' + err.message);
         btn.disabled = false;
         btn.textContent = 'Commit (−1 credit)';
-        alert('Commit failed: ' + err.message);
       }
     }
 
-    // ---- DB Committed history ----
+    function appendPreviewResult(data) {
+      const grid = el('previewGrid');
+      if (state.previews.length === 0) grid.innerHTML = '';
+
+      // sanitize urls
+      let urls = Array.isArray(data.urls) ? data.urls.filter(u => !isPlaceholderUrl(u)) : [];
+      const hadInvalid = (Array.isArray(data.urls) && urls.length !== data.urls.length);
+
+      const card = document.createElement('div');
+      card.className = 'card';
+
+      const mediaWrap = document.createElement('div');
+      mediaWrap.className = 'preview';
+
+      if (urls.length === 0){
+        const warn = document.createElement('div');
+        warn.className = 'small err';
+        warn.textContent = 'Το render δεν επέστρεψε έγκυρο αρχείο. Έλεγξε το backend (previews/render).';
+        card.appendChild(warn);
+      } else {
+        urls.forEach(u => {
+          if (u.endsWith('.mp4')) {
+            const v = document.createElement('video');
+            v.src = u; v.controls = true; v.playsInline = true;
+            mediaWrap.appendChild(v);
+          } else {
+            const img = document.createElement('img');
+            img.src = u; img.loading = 'lazy';
+            mediaWrap.appendChild(img);
+          }
+        });
+        card.appendChild(mediaWrap);
+      }
+
+      if (hadInvalid){
+        const info = document.createElement('div');
+        info.className = 'small warn';
+        info.textContent = 'Παράχθηκαν μη έγκυρα URLs (placeholder). Αγνοήθηκαν.';
+        card.appendChild(info);
+      }
+
+      const meta = document.createElement('div');
+      meta.className = 'small muted';
+      meta.textContent = `preview_id: ${data.preview_id}`;
+
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-primary';
+      btn.textContent = 'Commit (−1 credit)';
+      btn.addEventListener('click', () => commitPreview(data, btn));
+
+      card.appendChild(document.createElement('div')).className = 'spacer';
+      card.appendChild(btn);
+      card.appendChild(document.createElement('div')).className = 'spacer';
+      card.appendChild(meta);
+
+      grid.prepend(card);
+
+      // Τοπικό mini-history (session)
+      const hist = el('history');
+      if (state.previews.length === 0) hist.innerHTML = '';
+      const item = document.createElement('div');
+      item.className = 'card';
+      item.innerHTML = `
+        <div class="small muted">preview_id: ${data.preview_id}</div>
+        <div class="small">${urls.length} αρχεία</div>
+      `;
+      hist.prepend(item);
+
+      state.previews.push({ ...data, urls });
+    }
+
+    // ---- ΙΣΤΟΡΙΚΟ (DB) ----
     async function refreshCommitted(){
-      const grid = el('committedGrid');
-      grid.innerHTML = '';
+      const cont = el('history');
+      if (!cont) return;
+      cont.innerHTML = '<div class="muted">Φόρτωση…</div>';
       try{
-        const res = await fetch('/previews/committed?limit=24&offset=0');
+        const res = await fetch('/previews/committed?limit=20&offset=0');
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        if (!data.items || data.items.length === 0){
-          grid.innerHTML = '<div class="muted">Κενό.</div>';
+        let payload = await res.json();
+
+        const rows = Array.isArray(payload) ? payload
+                   : (payload && Array.isArray(payload.items)) ? payload.items
+                   : [];
+
+        if (!rows.length){
+          cont.innerHTML = '<div class="muted">Κενό.</div>';
           return;
         }
-        data.items.forEach(it => {
-          const div = document.createElement('div');
-          div.className = 'preview-card';
-          const url = (it.urls && it.urls[0]) || '';
-          const media = document.createElement(url.endsWith('.mp4') ? 'video' : 'img');
-          media.className = 'thumb';
-          if (media.tagName.toLowerCase()==='video'){
-            media.src = url; media.controls = true; media.playsInline = true;
-          } else {
-            media.src = url; media.loading = 'lazy';
+
+        cont.innerHTML = '';
+        rows.forEach(item => {
+          let urls = item.urls ?? item.urls_json ?? [];
+          if (typeof urls === 'string') {
+            try { urls = JSON.parse(urls); } catch { urls = []; }
           }
-          const meta = document.createElement('div');
-          meta.className = 'preview-meta';
-          meta.innerHTML = `<div class="small muted">#${it.id} • ${it.preview_id}</div><div class="badge ok">DB</div>`;
-          div.appendChild(media);
-          div.appendChild(meta);
-          grid.appendChild(div);
+          if (!Array.isArray(urls)) urls = [];
+          urls = urls.filter(u => !isPlaceholderUrl(u));
+
+          const box = document.createElement('div');
+          box.className = 'card';
+
+          const media = urls.map(u => {
+            const safe = String(u || '');
+            if (safe.endsWith('.mp4')) {
+              return `<video src="${safe}" controls playsinline style="width:100%;border:1px solid var(--border);border-radius:8px;margin-top:6px"></video>`;
+            }
+            return `<img src="${safe}" style="width:100%;border:1px solid var(--border);border-radius:8px;margin-top:6px">`;
+          }).join('');
+
+          box.innerHTML = `
+            <div class="small muted">post_id: ${item.id ?? ''}</div>
+            <div class="small muted">preview_id: ${item.preview_id ?? ''}</div>
+            <div class="small muted">${item.created_at ?? ''}</div>
+            ${media || '<div class="small muted">— χωρίς media —</div>'}
+          `;
+          cont.appendChild(box);
         });
       }catch(err){
-        grid.innerHTML = `<div class="muted small">Load failed: ${err.message}</div>`;
+        cont.innerHTML = `<div class="err small">Αποτυχία ιστορικού: ${err.message}</div>`;
       }
     }
-    el('btnRefreshCommitted').addEventListener('click', refreshCommitted);
 
-    // ---- Reset ----
     function doReset() {
       state.selectedTemplateId = null;
       state.selectedProductId = null;
@@ -545,16 +551,51 @@
       el('extraImagesPreview').textContent = '';
       el('previewGrid').innerHTML = '<div class="muted">Κανένα preview ακόμα.</div>';
       el('history').innerHTML = '<div class="muted">Κενό.</div>';
-      el('committedGrid').innerHTML = '<div class="muted">Κενό.</div>';
       setStatus('Reset.', 'muted');
+      refreshCredits();
     }
 
-    // ---- Bind buttons ----
+    // ---- Δημιουργία Preview από κάρτα προϊόντος (Engine flow) ----
+    async function createImagePreview(productId, btn){
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Δημιουργία preview…';
+      try{
+        el('productId').value = productId;           // συγχρονίζουμε input
+        el('postType').value = 'image';              // εξαναγκάζουμε image
+        await doRender();                            // free render
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
+    }
+
+    // ---- Buttons / init ----
     el('btnRender').addEventListener('click', doRender);
     el('btnReset').addEventListener('click', doReset);
 
-    // Προαιρετικά: φόρτωσε αμέσως και το DB history στην πρώτη είσοδο στο tab
-    // εδώ το αφήνω manual με το κουμπί Ανανέωση για ξεκάθαρη ροή.
+    el('btnSetToken').addEventListener('click', () => {
+      const val = prompt('Δώσε JWT token (ΜΟΝΟ το token, χωρίς "Bearer ")');
+      if (!val) return;
+      localStorage.setItem('token', val.trim());
+      updateTokenState();
+      refreshCredits();
+    });
+
+    // Listeners για «Δημιουργία Εικόνας» στις κάρτες
+    $$('.btn-create-image').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const pid = btn.dataset.id;
+        if (!pid){ alert('Άγνωστο Product ID'); return; }
+        createImagePreview(pid, btn);
+      });
+    });
+
+    // αρχικοποίηση
+    updateTokenState();
+    refreshCredits();
+    refreshCommitted();
   </script>
 </body>
 </html>
