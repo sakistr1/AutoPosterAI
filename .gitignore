@@ -6,3 +6,16 @@ database.db
 .env
 .DS_Store
 *.log
+# env & local
+.env
+*.env
+venv/
+__pycache__/
+*.pyc
+
+# sqlite & generated
+*.db
+*.sqlite
+production_engine/engine.db
+static/generated/
+static/uploads/
