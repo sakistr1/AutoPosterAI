@@ -4,9 +4,10 @@ import json
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Body, Header, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel
 from sqlalchemy import insert, select, desc
 from PIL import Image, ImageDraw, ImageFont
+from urllib.parse import urljoin
 
 from production_engine.engine_database import engine, committed_posts_table
 from production_engine.engine_database import pe_templates_table  # για resolve spec
@@ -23,8 +24,8 @@ router = APIRouter()
 # -----------------------------
 # Models
 # -----------------------------
-class TextFields(BaseModel):
-    __root__: dict
+class TextFields(RootModel[dict]):
+    pass
 
 
 class RenderRequest(BaseModel):
@@ -41,7 +42,8 @@ class RenderRequest(BaseModel):
 
 class CommitRequest(BaseModel):
     preview_id: str = Field(..., description="Το preview_id που επέστρεψε το /previews/render")
-    urls: List[str] = Field(..., description="Τελικές URLs που κάνουμε commit")
+    # ΠΡΙΝ: urls required. ΤΩΡΑ: προαιρετικό με fallback από preview_id
+    urls: Optional[List[str]] = Field(default=None, description="Τελικές URLs. Προαιρετικό – γίνεται fallback.")
 
 
 # -----------------------------
@@ -112,35 +114,96 @@ def _paste_fit(img: Image.Image, slot: dict) -> Image.Image:
     return target
 
 
+# -------- ΝΕΟ: word-wrap με βάση πλάτος σε pixels (για slots) --------
+def _wrap_text_by_width(text: str, font: ImageFont.FreeTypeFont, max_width: int, draw: ImageDraw.ImageDraw):
+    """
+    Επιστρέφει λίστα από lines που χωράνε σε max_width.
+    Κάνει hard-cut σε υπερμεγεθείς "λέξεις".
+    """
+    lines = []
+    for paragraph in str(text or "").split("\n"):
+        if not paragraph.strip():
+            lines.append("")
+            continue
+        words = paragraph.split(" ")
+        line = ""
+        for w in words:
+            candidate = (line + " " + w).strip()
+            bb = draw.textbbox((0, 0), candidate, font=font)
+            if (bb[2] - bb[0]) <= max_width:
+                line = candidate
+            else:
+                if line:
+                    lines.append(line)
+                    line = w
+                else:
+                    # πολύ μεγάλη "λέξη" -> κόψε χαρακτήρα-χαρακτήρα
+                    acc = ""
+                    for ch in w:
+                        trial = acc + ch
+                        bb2 = draw.textbbox((0, 0), trial, font=font)
+                        if (bb2[2] - bb2[0]) > max_width and acc:
+                            lines.append(acc)
+                            acc = ch
+                        else:
+                            acc = trial
+                    if acc:
+                        line = acc
+        if line:
+            lines.append(line)
+    return lines
+
+
 def _draw_text(draw: ImageDraw.ImageDraw, slot: dict, text: str, font_dir: str):
+    """
+    Βελτιωμένο text renderer για slots:
+    - Ελληνικά TTF (NotoSans)
+    - Pixel-width wrapping
+    - Στοίχιση left/center/right
+    - Stroke, line_spacing
+    - Clip εντός ύψους slot
+    """
     x, y, w, h = slot["x"], slot["y"], slot["w"], slot["h"]
     align = slot.get("align", "left")
-    size = slot.get("font_size", 36)
+    size = int(slot.get("font_size", 36))
     color = slot.get("color", "#ffffff")
-    bold = slot.get("bold", False)
+    bold = bool(slot.get("bold", False))
+    stroke_w = int(slot.get("stroke_width", 2))
+    stroke_c = slot.get("stroke_color", "#0a0a0a")
+    line_spacing = float(slot.get("line_spacing", 1.15))
 
     # Φόρτωση font με ελληνικά (NotoSans στο assets/fonts)
-    font_path = os.path.join(font_dir, "NotoSans-Regular.ttf")
-    if bold:
-        bold_path = os.path.join(font_dir, "NotoSans-Bold.ttf")
-        if os.path.exists(bold_path):
-            font_path = bold_path
-
+    font_path = os.path.join(font_dir, "NotoSans-Bold.ttf" if bold else "NotoSans-Regular.ttf")
     try:
         font = ImageFont.truetype(font_path, size=size)
     except Exception:
         font = ImageFont.load_default()
 
-    # απλό draw (τα slots είναι single-line όπως πριν)
-    tx = x
-    anchor = "lt"
-    if align == "center":
-        tx = x + w // 2
-        anchor = "mt"
-    elif align == "right":
-        tx = x + w
-        anchor = "rt"
-    draw.text((tx, y), text, font=font, fill=color, anchor=anchor)
+    # Τύλιγμα
+    lines = _wrap_text_by_width(text or "", font, w, draw)
+
+    # line-height
+    ref = draw.textbbox((0, 0), "Ag", font=font)
+    line_h = max(1, int((ref[3] - ref[1]) * line_spacing))
+
+    cur_y = y
+    for line in lines:
+        # stop αν ξεπερνά το ύψος του slot
+        if cur_y > y + h - line_h:
+            break
+        bb = draw.textbbox((0, 0), line, font=font)
+        w_px = bb[2] - bb[0]
+        if align == "center":
+            tx = x + (w - w_px) // 2
+        elif align == "right":
+            tx = x + (w - w_px)
+        else:
+            tx = x
+        if stroke_w > 0:
+            draw.text((tx, cur_y), line, font=font, fill=color, stroke_width=stroke_w, stroke_fill=stroke_c)
+        else:
+            draw.text((tx, cur_y), line, font=font, fill=color)
+        cur_y += line_h
 
 
 # -----------------------------
@@ -214,7 +277,7 @@ def render_image(payload: RenderRequest):
         # brand_logo_url -> filesystem path αν είναι /static/...
         brand_logo_path = None
         if payload.brand_logo_url and isinstance(payload.brand_logo_url, str) and payload.brand_logo_url.startswith("/static/"):
-            rel = payload.brand_logo_url[len("/static/"):]  # π.χ. uploads/brand/logo.png
+            rel = payload.brand_logo_url[len("/static/"):]
             brand_logo_path = os.path.join(STATIC_ROOT, rel)
 
         # Ρεντάρουμε προσωρινό PNG και το χρησιμοποιούμε ως base
@@ -290,35 +353,73 @@ async def debit_one_credit(authorization: Optional[str]) -> None:
 @router.post("/previews/commit")
 async def commit_preview(
     payload: CommitRequest,
+    request: Request,
     authorization: Optional[str] = Header(default=None, alias="Authorization")
 ):
     """
     1) Credits guard: debit 1 credit στο κεντρικό backend (αν δεν είναι disabled).
     2) Αν ΟΚ, γράφουμε committed_posts.
+    3) Fallback: αν δεν δόθηκαν urls, χρησιμοποίησε αυτόματα το /static/generated/<preview_id>.png
+    4) Normalize: πάντα ABSOLUTE URLs με βάση το request.base_url
     """
     await debit_one_credit(authorization)
+
+    base = str(request.base_url).rstrip("/")
+
+    # --- Derive final URLs ---
+    urls_in = payload.urls or []
+    urls: List[str] = []
+
+    if urls_in:
+        urls = urls_in
+    else:
+        # Fallback από το preview_id (δεν έχουμε preview table, άρα ανακατασκευή του path)
+        candidate_rel = f"/static/generated/{payload.preview_id}.png"
+        fs_path = os.path.join(GENERATED_DIR, f"{payload.preview_id}.png")
+        if os.path.exists(fs_path):
+            urls = [candidate_rel]
+        else:
+            raise HTTPException(status_code=422, detail="No URLs provided and preview file not found")
+
+    # Normalize -> ABSOLUTE
+    def to_abs(u: str) -> str:
+        if u.startswith("http://") or u.startswith("https://"):
+            return u
+        if u.startswith("/"):
+            return base + u
+        return urljoin(base + "/", u)
+
+    abs_urls = [to_abs(u) for u in urls]
 
     now = datetime.utcnow()
     with engine.begin() as conn:
         res = conn.execute(
             insert(committed_posts_table).values(
                 preview_id=payload.preview_id,
-                urls_json=json.dumps(payload.urls),
+                urls_json=json.dumps(abs_urls),
                 created_at=now
             )
         )
         new_id = res.inserted_primary_key[0]
 
-    return {"post_id": int(new_id), "preview_id": payload.preview_id, "urls": payload.urls, "created_at": now.isoformat() + "Z"}
+    return {
+        "post_id": int(new_id),
+        "preview_id": payload.preview_id,
+        "urls": abs_urls,
+        "created_at": now.isoformat() + "Z",
+    }
 
 
 @router.get("/previews/committed")
-def list_committed(limit: int = 20, offset: int = 0):
+def list_committed(request: Request, limit: int = 20, offset: int = 0):
     """
     Επιστρέφει πρόσφατα commits με basic pagination.
+    ΠΑΝΤΑ επιστρέφει ABS URLs.
     """
     limit = max(1, min(100, int(limit)))
     offset = max(0, int(offset))
+
+    base = str(request.base_url).rstrip("/")
 
     with engine.connect() as conn:
         rows = conn.execute(
@@ -332,16 +433,24 @@ def list_committed(limit: int = 20, offset: int = 0):
              .offset(offset)
         ).mappings().all()
 
+    def to_abs(u: str) -> str:
+        if u.startswith("http://") or u.startswith("https://"):
+            return u
+        if u.startswith("/"):
+            return base + u
+        return urljoin(base + "/", u)
+
     out = []
     for r in rows:
         try:
             urls = json.loads(r["urls_json"] or "[]")
         except Exception:
             urls = []
+        abs_urls = [to_abs(str(u)) for u in urls]
         out.append({
             "id": int(r["id"]),
             "preview_id": r["preview_id"],
-            "urls": urls,
+            "urls": abs_urls,
             "created_at": r["created_at"].isoformat() + "Z" if r.get("created_at") else None
         })
     return {"items": out, "limit": limit, "offset": offset, "count": len(out)}

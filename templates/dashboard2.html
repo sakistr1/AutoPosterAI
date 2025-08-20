@@ -1,645 +1,264 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="el">
 <head>
-  <meta charset="UTF-8" />
-  <title>AutoPoster AI — Dashboard 2 (Production Engine)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AutoPoster — Wizard v2 (Pro)</title>
   <style>
-    :root { --bg:#0b1220; --bg2:#0f172a; --card:#111827; --muted:#9ca3af; --text:#e5e7eb; --accent:#22c55e; --accent-2:#60a5fa; --danger:#ef4444; --border:#1f2937; }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;color:var(--text);background:linear-gradient(180deg,var(--bg),var(--bg2))}
-    header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);background:#0b1220;position:sticky;top:0;z-index:10}
-    header h1{font-size:18px;margin:0}
-    .tags{display:flex;gap:8px;flex-wrap:wrap}
-    .tag{display:inline-flex;align-items:center;gap:6px;background:#0b1020;border:1px solid var(--border);color:#cbd5e1;padding:4px 10px;border-radius:999px;font-size:12px;cursor:default}
-    .tag.button{cursor:pointer}
-    .wrap{max-width:1200px;margin:24px auto;padding:0 16px}
-    .tabs{display:flex;gap:6px;border-bottom:1px solid var(--border)}
-    .tab{padding:10px 14px;border:1px solid var(--border);border-bottom:none;border-radius:12px 12px 0 0;background:#0b1020;color:#cbd5e1;cursor:pointer}
-    .tab.active{background:var(--card);color:#fff}
-    .tab-content{border:1px solid var(--border);border-top:none;background:var(--card);border-radius:0 14px 14px 14px;padding:16px}
-    .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    .row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
-    .card{background:#0b1020;border:1px solid var(--border);border-radius:14px;padding:14px}
-    h2{font-size:16px;margin:0 0 10px}
-    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
-    input,select,button,textarea{width:100%;background:#070d1a;border:1px solid var(--border);color:#var(--text);padding:10px 12px;border-radius:10px}
-    input:focus,select:focus,textarea:focus{outline:none;border-color:#334155}
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:10px;border:1px solid var(--border);padding:10px 14px;cursor:pointer;background:#0c1327}
-    .btn-primary{background:var(--accent);border-color:transparent;color:#0b1220;font-weight:600}
-    .btn-alt{background:#0c1633}
-    .btn-danger{background:#1b0b0b;border-color:#3b0c0c;color:#fca5a5}
-    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-    .template-card,.product-card{border:1px solid var(--border);border-radius:12px;padding:10px;background:#0b1020;cursor:pointer}
-    .template-card.active,.product-card.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(34,197,94,.2) inset}
-    .muted{color:var(--muted);font-size:13px}
-    .small{font-size:12px;color:#94a3b8}
-    .hint{display:block;margin-top:4px;font-size:12px;color:#9ca3af}
-    .preview{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-    .preview img,.preview video{width:100%;border-radius:12px;border:1px solid var(--border);background:#0b1020}
-    .actions{display:flex;gap:8px;flex-wrap:wrap}
-    .status{margin-top:8px;font-size:12px}
-    .ok{color:#86efac}.warn{color:#facc15}.err{color:#fca5a5}
-    .spacer{height:8px}
-    .product-actions .btn{width:100%}
-    .product-card .muted.small{display:block;margin-top:4px}
-    .product-thumb{width:100%;height:auto;border:1px solid var(--border);border-radius:8px;background:#0b1020;margin-bottom:6px}
-    @media (max-width: 980px){ .row,.row-3,.preview,.grid{grid-template-columns:1fr} }
+    :root{
+      --bg:#0b1020;--panel:#0f1522;--muted:#9bb3ff;--fg:#e6ecff;
+      --line:#27314a;--btn:#2a66ff;--btn-2:#1e2a48;--ok:#79ff9f;--err:#ff8080;
+    }
+    body{background:var(--bg);color:var(--fg);font-family:Inter,system-ui,Segoe UI,Arial;margin:0}
+    .apw2-fab{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+      background:var(--btn);color:#fff;border:0;padding:10px 16px;border-radius:999px;
+      font-weight:600;box-shadow:0 8px 18px rgba(0,0,0,.25);z-index:9999;cursor:pointer}
+    .apw2-modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;z-index:10000}
+    .apw2-dialog{background:var(--panel);color:var(--fg);width:min(980px,94vw);
+      margin:5vh auto;border-radius:14px;padding:16px 18px;box-shadow:0 10px 32px rgba(0,0,0,.4)}
+    .apw2-row{display:flex;gap:12px;align-items:center;margin:10px 0}
+    .apw2-col{display:flex;flex-direction:column;gap:10px}
+    .apw2-row input,.apw2-row select,.apw2-row textarea{background:#0b1020;border:1px solid var(--line);
+      color:var(--fg);border-radius:10px;padding:8px 10px;flex:1}
+    .apw2-btn{background:var(--btn-2);color:#fff;border:1px solid #2f436b;border-radius:10px;padding:10px 14px;cursor:pointer}
+    .apw2-btn.primary{background:var(--btn);border-color:var(--btn)}
+    .apw2-btn[disabled]{opacity:.6;cursor:not-allowed}
+    .apw2-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .apw2-preview{min-height:260px;border:1px dashed var(--line);border-radius:12px;padding:10px;display:flex;align-items:center;justify-content:center}
+    .apw2-preview img,.apw2-preview video{max-width:100%;max-height:100%;border-radius:10px}
+    .apw2-muted{opacity:.8;font-size:.9em;color:var(--muted)}
+    .apw2-actions{display:flex;gap:10px;flex-wrap:wrap}
+    .apw2-final{display:none;gap:10px;align-items:center;margin-top:8px}
+    .apw2-sep{height:1px;background:var(--line);margin:8px 0}
+    .apw2-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+    .apw2-head .title{font-weight:700}
+    .apw2-note{font-size:.9em;color:var(--muted)}
+    .hide{display:none !important}
   </style>
 </head>
 <body>
-  <header>
-    <h1>AutoPoster AI — Production Dashboard</h1>
-    <div class="tags">
-      <span class="tag">Preview = Free</span>
-      <span class="tag">Commit = −1 credit</span>
-      <span class="tag">Απομονωμένο subsystem</span>
-      <span class="tag button" id="btnSetToken">Set Token</span>
-      <span class="tag" id="tokenState">No token</span>
-      <span class="tag" id="creditsBadge">Credits: —</span>
-    </div>
-  </header>
+  <div style="padding:16px;opacity:.85">
+    <div>Wizard v2 (Pro). Πάτα κάτω: <b>+ Νέο Post (v2)</b></div>
+  </div>
 
-  <div class="wrap">
-    <div class="tabs">
-      <div class="tab active" data-tab="templates">Templates</div>
-      <div class="tab" data-tab="products">Προϊόντα</div>
-      <div class="tab" data-tab="previews">Previews</div>
-    </div>
-
-    <div class="tab-content" id="tab-templates">
-      <div class="row">
-        <div class="card">
-          <h2>Λίστα Templates</h2>
-          <div class="muted small">MVP: manual λίστα για αρχή. Μετά θα φορτώνουμε από DB + mapping.</div>
-          <div class="spacer"></div>
-          <div class="grid" id="templatesGrid"></div>
-        </div>
-
-        <div class="card">
-          <h2>Επιλογές Render</h2>
-          <div class="row-3">
-            <div>
-              <label for="postType">Τύπος Post</label>
-              <select id="postType">
-                <option value="image">Image</option>
-                <option value="carousel">Carousel</option>
-                <option value="video">Video</option>
-              </select>
-            </div>
-            <div>
-              <label for="mode">Ύφος</label>
-              <select id="mode">
-                <option>Κανονικό</option>
-                <option>Χιουμοριστικό</option>
-                <option>Επαγγελματικό</option>
-                <option>Ρομαντικό</option>
-                <option>Επιθετικό Marketing</option>
-              </select>
-            </div>
-            <div>
-              <label for="productId">Product ID (προσωρινά)</label>
-              <input id="productId" placeholder="π.χ. 101" />
-            </div>
-          </div>
-
-          <div class="spacer"></div>
-          <div class="row-3">
-            <div>
-              <label for="brandLogo">Λογότυπο <span class="small">*</span></label>
-              <input type="file" id="brandLogo" accept=".png,.jpg,.jpeg,.svg" />
-              <span class="hint">* Προαιρετικό. SVG/PNG με διαφάνεια.</span>
-              <div id="brandLogoPreview" class="small muted" style="margin-top:6px;"></div>
-            </div>
-            <div>
-              <label for="extraImages">Extra φωτογραφίες <span class="small">*</span></label>
-              <input type="file" id="extraImages" accept=".png,.jpg,.jpeg,.webp" multiple />
-              <span class="hint">* 2–4 εικόνες, ≥1200px.</span>
-              <div id="extraImagesPreview" class="small muted" style="margin-top:6px;"></div>
-            </div>
-            <div>
-              <label>&nbsp;</label>
-              <div class="small muted">Προαιρετικά για καλύτερο αποτέλεσμα.</div>
-            </div>
-          </div>
-
-          <div class="spacer"></div>
-          <div class="actions">
-            <button class="btn btn-primary" id="btnRender">Δημιουργία Preview</button>
-            <button class="btn btn-alt" id="btnReset">Reset</button>
-          </div>
-          <div class="status muted" id="status"></div>
+  <div id="apw2" class="apw2-modal" aria-hidden="true">
+    <div class="apw2-dialog">
+      <div class="apw2-head">
+        <div class="title">Wizard v2</div>
+        <div class="apw2-actions">
+          <button class="apw2-btn" id="apw2Cancel">Ακύρωση</button>
+          <button class="apw2-btn primary" id="apw2Close">Κλείσιμο</button>
         </div>
       </div>
 
-      <div class="spacer"></div>
-      <div class="card">
-        <h2>Αποτελέσματα</h2>
-        <div id="previewGrid" class="preview">
-          <div class="muted">Κανένα preview ακόμα.</div>
-        </div>
-      </div>
-    </div>
+      <div class="apw2-grid">
+        <!-- LEFT: Controls -->
+        <div class="apw2-col">
+          <div class="apw2-row">
+            <label style="min-width:130px">Token</label>
+            <input id="apw2Token" placeholder="Bearer JWT (άστο κενό αν έχει Set Token)">
+          </div>
 
-    <div class="tab-content" id="tab-products" style="display:none">
-      <div class="card">
-        <h2>Προϊόντα</h2>
-        <div class="muted small">Γεμίζει από <code>/me/products</code>. Αν λείπει token ή αποτύχει, θα δεις demo.</div>
-        <div class="spacer"></div>
-        <div class="grid" id="productsGrid">
-          <div class="muted">Φόρτωση…</div>
-        </div>
-      </div>
-    </div>
+          <div class="apw2-row">
+            <label style="min-width:130px">Προϊόν (demo)</label>
+            <select id="apw2ProductSel" style="flex:1">
+              <option value="84">#84 — Demo προϊόν</option>
+              <option value="85">#85 — Demo προϊόν</option>
+              <option value="86">#86 — Demo προϊόν</option>
+              <option value="__custom">Άλλο…</option>
+            </select>
+            <input id="apw2ProductCustom" class="hide" placeholder="Π.χ. 84" style="max-width:130px">
+          </div>
 
-    <div class="tab-content" id="tab-previews" style="display:none">
-      <div class="card">
-        <h2>Ιστορικό (DB)</h2>
-        <div class="muted small">Committed posts από τη βάση.</div>
-        <div class="spacer"></div>
-        <div id="history" class="preview">
-          <div class="muted">Κενό.</div>
+          <div class="apw2-row">
+            <label style="min-width:130px">Template</label>
+            <select id="apw2TplSel" style="flex:1"><option value="">(χωρίς)</option></select>
+            <button class="apw2-btn" id="apw2TplRefresh" title="Ανανέωση templates">↻</button>
+          </div>
+
+          <div class="apw2-row">
+            <label style="min-width:130px">Post type</label>
+            <select id="apw2Type"><option value="image">image</option><option value="video">video</option></select>
+            <label style="min-width:70px">Tone</label>
+            <select id="apw2Tone"><option>Κλασικό</option><option>Προωθητικό</option><option>Χιουμοριστικό</option></select>
+          </div>
+
+          <div class="apw2-row"><label style="min-width:130px">Τίτλος</label><input id="apw2Title" placeholder="Τίτλος…"></div>
+          <div class="apw2-row"><label style="min-width:130px">Τιμή</label><input id="apw2Price" placeholder="π.χ. 29.90"></div>
+          <div class="apw2-row"><label style="min-width:130px">CTA</label><input id="apw2CTA" value="Παράγγειλε τώρα"></div>
+
+          <div class="apw2-sep"></div>
+          <div class="apw2-actions">
+            <button class="apw2-btn primary" id="apw2Render">Δημιουργία Προεπισκόπησης</button>
+            <button class="apw2-btn" id="apw2Commit" disabled>Ολοκλήρωση & Χρέωση</button>
+          </div>
+          <div class="apw2-muted" id="apw2Status"></div>
+
+          <div class="apw2-final" id="apw2Final">
+            <a id="apw2Download" class="apw2-btn" download="post.png">Κατέβασμα</a>
+            <button class="apw2-btn" id="apw2Copy">Αντιγραφή συνδέσμου</button>
+            <button class="apw2-btn" id="apw2ShareX">Κοινοποίηση σε X</button>
+            <button class="apw2-btn" id="apw2ShareFB">Κοινοποίηση σε Facebook</button>
+            <span class="apw2-note">Instagram: κατέβασε την εικόνα και ανέβασέ την.</span>
+          </div>
+        </div>
+
+        <!-- RIGHT: Preview -->
+        <div>
+          <div class="apw2-preview" id="apw2Wrap"><span class="apw2-muted">Η προεπισκόπηση θα εμφανιστεί εδώ</span></div>
         </div>
       </div>
     </div>
   </div>
 
+  <button class="apw2-fab" id="apw2Open">+ Νέο Post (v2)</button>
+
   <script>
-    // ---- State ----
-    const state = {
-      selectedTemplateId: null,
-      selectedProductId: null,
-      previews: [],
-      brandLogoUrl: null,
-      extraImageUrls: [],
-    };
+  (function(){
+    if (window.__apw2) return; window.__apw2=true;
+    const $ = s => document.querySelector(s);
+    const W = { preview:null, urls:[] };
 
-    // ---- Helpers ----
-    const el = (id) => document.getElementById(id);
-    const $ = (sel, root=document) => root.querySelector(sel);
-    const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
-    const setStatus = (msg, cls='muted') => { const s = el('status'); s.className = 'status ' + cls; s.textContent = msg; };
-
-    const getToken = () => localStorage.getItem('token') || '';
-    function updateTokenState(){
-      const t = getToken();
-      const s = el('tokenState');
-      if (s) s.textContent = t ? 'Token: set' : 'No token';
+    // --- helpers
+    function setStatus(msg, cls){
+      const el=$('#apw2Status'); el.textContent=msg||'';
+      el.style.color = cls==='err'?'var(--err)':cls==='ok'?'var(--ok)':'var(--muted)';
     }
-    async function refreshCredits(){
-      const badge = el('creditsBadge');
-      const t = getToken();
-      if (!badge) return;
-      if (!t){ badge.textContent = 'Credits: —'; return; }
+    function getToken(){
+      try{ if (typeof window.getToken==='function'){ const t=window.getToken(); if (t) return t; } }catch(_){}
+      const t = ($('#apw2Token').value||'').trim();
+      return t || (localStorage.token||localStorage.jwt||'');
+    }
+    function extractUrls(obj){
       try{
-        const res = await fetch('/me/credits', { headers: { Authorization: 'Bearer ' + t } });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        const n = (data && typeof data.credits === 'number') ? data.credits : '?';
-        badge.textContent = 'Credits: ' + n;
-      }catch(_){
-        badge.textContent = 'Credits: ?';
-      }
+        if (!obj) return [];
+        const out=[], add=u=>{ if(!u) return; if(Array.isArray(u)) u.forEach(add); else if(typeof u==='string') out.push(u); };
+        add(obj.urls); add(obj.urls_json); add(obj.images); add(obj.preview_images);
+        add(obj.preview_url); add(obj.image_url); add(obj.final_url); add(obj.static_path); add(obj.path); add(obj.output);
+        if (obj.file) out.push('/static/generated/'+String(obj.file).replace(/^\/+/,'')); // backend σου
+        const seen=new Set(); return out.filter(Boolean).filter(u=>!seen.has(u)&&seen.add(u));
+      }catch(e){ return []; }
     }
-
-    // ---- Tabs ----
-    $$('.tab').forEach(t => t.addEventListener('click', () => {
-      $$('.tab').forEach(x => x.classList.remove('active'));
-      t.classList.add('active');
-      const name = t.dataset.tab;
-      $$('.tab-content').forEach(c => c.style.display = 'none');
-      el('tab-' + name).style.display = '';
-      if (name === 'previews') refreshCommitted();
-      if (name === 'products') loadProducts();
-    }));
-
-    // ---- Templates (MVP: manual list) ----
-    const templates = [
-      { id: 1, name: 'img_product_clean', type: 'image', ratio: '1:1' },
-      { id: 2, name: 'img_lifestyle_hint', type: 'image', ratio: '4:5' },
-      { id: 3, name: 'img_discount_card', type: 'image', ratio: '1:1' },
-      { id: 4, name: 'car_features_steps', type: 'carousel', ratio: '1:1' },
-      { id: 5, name: 'car_multi_grid', type: 'carousel', ratio: '4:5' },
-      { id: 6, name: 'vid_slideshow_overlay', type: 'video', ratio: '9:16' },
-    ];
-
-    const templatesGrid = el('templatesGrid');
-    function renderTemplates() {
-      templatesGrid.innerHTML = '';
-      templates.forEach(t => {
-        const div = document.createElement('div');
-        div.className = 'template-card';
-        div.dataset.id = t.id;
-        div.innerHTML = `<strong>#${t.id} ${t.name}</strong><br><span class="muted small">${t.type.toUpperCase()} • ${t.ratio}</span>`;
-        div.addEventListener('click', () => {
-          $$('.template-card').forEach(x => x.classList.remove('active'));
-          div.classList.add('active');
-          state.selectedTemplateId = t.id;
-          setStatus(`Επιλέχθηκε template #${t.id}`, 'ok');
-          el('postType').value = (t.type === 'carousel') ? 'carousel' : (t.type === 'video' ? 'video' : 'image');
-        });
-        templatesGrid.appendChild(div);
+    function renderUrls(urls){
+      const wrap=$('#apw2Wrap'); wrap.innerHTML='';
+      if (!urls.length){ wrap.innerHTML='<span class="apw2-muted">Δεν ήρθαν URLs από /previews/render.</span>'; return; }
+      urls.forEach(u=>{
+        if (/\\.mp4(\\?|$)/i.test(String(u))){ const v=document.createElement('video'); v.src=u; v.controls=true; v.playsInline=true; wrap.appendChild(v); }
+        else { const img=new Image(); img.loading='lazy'; img.src=u; wrap.appendChild(img); }
       });
     }
-    renderTemplates();
-
-    // ---- Upload handlers ----
-    async function uploadSingle(endpoint, file) {
-      const form = new FormData();
-      form.append('file', file);
-      const res = await fetch(endpoint, { method: 'POST', body: form });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const json = await res.json();
-      return json.url; // string
+    function payloadFromUI(){
+      const sel = $('#apw2ProductSel').value;
+      const pid = (sel==='__custom' ? Number($('#apw2ProductCustom').value||0)||null : Number(sel));
+      return {
+        product_id: pid,
+        post_type: ($('#apw2Type').value||'image'),
+        tone: $('#apw2Tone').value||'Κλασικό',
+        template_key: ($('#apw2TplSel').value||'') || null,
+        text: { title: $('#apw2Title').value||'', price: $('#apw2Price').value||'', cta: $('#apw2CTA').value||'' },
+        extras: []
+      };
+    }
+    async function refreshTemplates(){
+      try{
+        const res = await fetch('/tengine/templates');
+        if (!res.ok){ setStatus('Templates: HTTP '+res.status, 'err'); return; }
+        const list = await res.json();
+        const sel = $('#apw2TplSel'); const cur = sel.value;
+        sel.innerHTML = '<option value=\"\">(χωρίς)</option>' + (list||[]).map(x=>`<option value=\"${x.key||x.name||''}\">${x.key||x.name}</option>`).join('');
+        if ([...sel.options].some(o=>o.value===cur)) sel.value = cur;
+        setStatus('Templates OK', 'ok');
+      }catch(e){ setStatus('Templates: '+e.message, 'err'); }
     }
 
-    async function uploadMultiple(endpoint, files, productId) {
-      const form = new FormData();
-      [...files].forEach(f => form.append('files', f));
-      form.append('product_id', productId);
-      const res = await fetch(endpoint, { method: 'POST', body: form });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const json = await res.json();
-      return json.urls || []; // string[]
-    }
-
-    const brandLogoInput = el('brandLogo');
-    const brandLogoPreview = el('brandLogoPreview');
-    brandLogoInput.addEventListener('change', async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      brandLogoPreview.textContent = 'Ανέβασμα...';
-      try {
-        const url = await uploadSingle('/assets/upload_logo', file);
-        state.brandLogoUrl = url;
-        brandLogoPreview.innerHTML = `OK <span class="ok">(${url})</span>`;
-      } catch (err) {
-        brandLogoPreview.innerHTML = `<span class="err">Αποτυχία: ${err.message}</span>`;
-      }
-    });
-
-    const extraImagesInput = el('extraImages');
-    const extraImagesPreview = el('extraImagesPreview');
-    extraImagesInput.addEventListener('change', async (e) => {
-      const files = e.target.files || [];
-      if (!files.length) return;
-      const pid = el('productId').value;
-      if (!pid) {
-        extraImagesPreview.innerHTML = '<span class="warn">Δώσε πρώτα Product ID.</span>';
-        return;
-      }
-      extraImagesPreview.textContent = 'Ανέβασμα...';
-      try {
-        const urls = await uploadMultiple('/assets/upload_product_images', files, pid);
-        state.extraImageUrls = urls;
-        extraImagesPreview.innerHTML = `OK: ${urls.length} εικόνες`;
-      } catch (err) {
-        extraImagesPreview.innerHTML = `<span class="err">Αποτυχία: ${err.message}</span>`;
-      }
-    });
-
-    // ---- Preview render ----
-    function isPlaceholderUrl(u){
-      const s = String(u || '');
-      return s.includes('<') || s.includes('>') || s.includes('%3C') || s.includes('%3E') || s.includes('from_render');
-    }
-
-    async function doRender() {
-      const template_id = state.selectedTemplateId || 1;
-      const product_id = el('productId').value ? parseInt(el('productId').value, 10) : null;
-      const post_type = el('postType').value || 'image';
-      const mode = el('mode').value || 'Κανονικό';
-
-      if (!template_id) { setStatus('Διάλεξε template.', 'warn'); return; }
-      if (!post_type) { setStatus('Διάλεξε τύπο post.', 'warn'); return; }
-
-      setStatus('Δημιουργία preview...', 'muted');
-      try {
+    // --- actions
+    async function doRender(){
+      const t = getToken(); if (!t){ setStatus('Βάλε token (Set Token).', 'err'); return; }
+      const payload = payloadFromUI();
+      if (!payload.product_id){ setStatus('Δώσε Product ID.', 'err'); return; }
+      setStatus('Render…');
+      $('#apw2Render').disabled = true;
+      try{
         const res = await fetch('/previews/render', {
-          method: 'POST',
-          headers: { 'Content-Type':'application/json' },
-          body: JSON.stringify({
-            template_id, product_id, post_type, mode,
-            brand_logo_url: state.brandLogoUrl || null,
-            extra_images: state.extraImageUrls || []
-          })
+          method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+t},
+          body: JSON.stringify(payload)
         });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
+        if (!res.ok) throw new Error('HTTP '+res.status+': '+await res.text());
         const data = await res.json();
-        appendPreviewResult(data);
+        W.preview = data; W.urls = extractUrls(data);
+        renderUrls(W.urls);
+        $('#apw2Commit').disabled = !data.preview_id;
         setStatus('OK', 'ok');
-        refreshCredits();
-      } catch (err) {
-        console.error(err);
-        setStatus('Απέτυχε το preview: ' + err.message, 'err');
+      }catch(err){
+        setStatus(err.message, 'err');
+      }finally{
+        $('#apw2Render').disabled = false;
       }
     }
-
-    // ---- Commit (−1 credit) ----
-    async function commitPreview(preview, btn){
-      const t = getToken();
-      if (!t){ alert('Βάλε token (Set Token) πριν το commit.'); return; }
-      btn.disabled = true;
-      btn.textContent = 'Committing…';
+    async function doCommit(){
+      const t = getToken(); if (!t){ setStatus('Βάλε token.', 'err'); return; }
+      if (!W.preview || !W.preview.preview_id){ setStatus('Δεν υπάρχει preview για commit.', 'err'); return; }
+      setStatus('Commit…');
+      $('#apw2Commit').disabled = true;
       try{
         const res = await fetch('/previews/commit', {
-          method: 'POST',
-          headers: {
-            'Content-Type':'application/json',
-            'Authorization': 'Bearer ' + t
-          },
-          body: JSON.stringify({ preview_id: preview.preview_id, urls: preview.urls || [] })
+          method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+t},
+          body: JSON.stringify({ preview_id: W.preview.preview_id, urls: (W.urls||[]) })
         });
-        if (!res.ok){
-          if (res.status === 402){
-            alert('Αποτυχία commit: Δεν έχεις credits.');
-            btn.disabled = false;
-            btn.textContent = 'Commit (−1 credit)';
-            await refreshCredits();
-            return;
-          }
-          const text = await res.text();
-          throw new Error(text || ('HTTP ' + res.status));
+        if (!res.ok) throw new Error('HTTP '+res.status+': '+await res.text());
+        setStatus('Ολοκλήρωση & Χρέωση OK', 'ok');
+        const url = (W.urls&&W.urls[0])||null;
+        if (url){
+          const d=$('#apw2Download'); d.href=url; d.style.pointerEvents='auto';
         }
-        btn.textContent = 'Committed';
-        btn.disabled = true;
-        await refreshCommitted();
-        await refreshCredits();
+        $('#apw2Final').style.display='flex';
       }catch(err){
-        alert('Απέτυχε: ' + err.message);
-        btn.disabled = false;
-        btn.textContent = 'Commit (−1 credit)';
+        setStatus(err.message, 'err');
+      }finally{
+        $('#apw2Commit').disabled = false;
       }
     }
-
-    function appendPreviewResult(data) {
-      const grid = el('previewGrid');
-      if (state.previews.length === 0) grid.innerHTML = '';
-
-      let urls = Array.isArray(data.urls) ? data.urls.filter(u => !isPlaceholderUrl(u)) : [];
-      const hadInvalid = (Array.isArray(data.urls) && urls.length !== data.urls.length);
-
-      const card = document.createElement('div');
-      card.className = 'card';
-
-      const mediaWrap = document.createElement('div');
-      mediaWrap.className = 'preview';
-
-      if (urls.length === 0){
-        const warn = document.createElement('div');
-        warn.className = 'small err';
-        warn.textContent = 'Το render δεν επέστρεψε έγκυρο αρχείο. Έλεγξε το backend (previews/render).';
-        card.appendChild(warn);
-      } else {
-        urls.forEach(u => {
-          if (u.endsWith('.mp4')) {
-            const v = document.createElement('video');
-            v.src = u; v.controls = true; v.playsInline = true;
-            mediaWrap.appendChild(v);
-          } else {
-            const img = document.createElement('img');
-            img.src = u; img.loading = 'lazy';
-            mediaWrap.appendChild(img);
-          }
-        });
-        card.appendChild(mediaWrap);
-      }
-
-      if (hadInvalid){
-        const info = document.createElement('div');
-        info.className = 'small warn';
-        info.textContent = 'Παράχθηκαν μη έγκυρα URLs (placeholder). Αγνοήθηκαν.';
-        card.appendChild(info);
-      }
-
-      const meta = document.createElement('div');
-      meta.className = 'small muted';
-      meta.textContent = `preview_id: ${data.preview_id}`;
-
-      const btn = document.createElement('button');
-      btn.className = 'btn btn-primary';
-      btn.textContent = 'Commit (−1 credit)';
-      btn.addEventListener('click', () => commitPreview(data, btn));
-
-      card.appendChild(document.createElement('div')).className = 'spacer';
-      card.appendChild(btn);
-      card.appendChild(document.createElement('div')).className = 'spacer';
-      card.appendChild(meta);
-
-      grid.prepend(card);
-
-      // Τοπικό mini-history (session)
-      const hist = el('history');
-      if (state.previews.length === 0) hist.innerHTML = '';
-      const item = document.createElement('div');
-      item.className = 'card';
-      item.innerHTML = `
-        <div class="small muted">preview_id: ${data.preview_id}</div>
-        <div class="small">${urls.length} αρχεία</div>
-      `;
-      hist.prepend(item);
-
-      state.previews.push({ ...data, urls });
+    function doCancel(){
+      W.preview=null; W.urls=[];
+      $('#apw2Wrap').innerHTML='<span class=\"apw2-muted\">Η προεπισκόπηση θα εμφανιστεί εδώ</span>';
+      $('#apw2Final').style.display='none';
+      setStatus('Ακυρώθηκε.');
+    }
+    async function copyLink(){
+      const url = (W.urls&&W.urls[0])||''; if (!url) return setStatus('Δεν υπάρχει URL.', 'err');
+      try{ await navigator.clipboard.writeText(url); setStatus('Αντιγράφηκε.', 'ok'); }catch(e){ setStatus('Αποτυχία αντιγραφής.', 'err'); }
+    }
+    function shareX(){
+      const url = (W.urls&&W.urls[0])||''; if (!url) return;
+      const text = encodeURIComponent('Νέο post');
+      const href = 'https://twitter.com/intent/tweet?text='+text+'&url='+encodeURIComponent(url);
+      window.open(href, '_blank', 'noopener');
+    }
+    function shareFB(){
+      const url = (W.urls&&W.urls[0])||''; if (!url) return;
+      const href = 'https://www.facebook.com/sharer/sharer.php?u='+encodeURIComponent(url);
+      window.open(href, '_blank', 'noopener');
     }
 
-    // ---- ΙΣΤΟΡΙΚΟ (DB) ----
-    async function refreshCommitted(){
-      const cont = el('history');
-      if (!cont) return;
-      cont.innerHTML = '<div class="muted">Φόρτωση…</div>';
-      try{
-        const res = await fetch('/previews/committed?limit=20&offset=0');
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        let payload = await res.json();
+    // --- bindings
+    $('#apw2Open').addEventListener('click', ()=>{ $('#apw2').style.display='block'; $('#apw2ProductSel').focus(); setStatus(''); refreshTemplates(); });
+    $('#apw2Close').addEventListener('click', ()=>{ $('#apw2').style.display='none'; });
+    $('#apw2Cancel').addEventListener('click', doCancel);
+    $('#apw2Render').addEventListener('click', doRender);
+    $('#apw2Commit').addEventListener('click', doCommit);
+    $('#apw2TplRefresh').addEventListener('click', refreshTemplates);
+    $('#apw2Copy').addEventListener('click', copyLink);
+    $('#apw2ShareX').addEventListener('click', shareX);
+    $('#apw2ShareFB').addEventListener('click', shareFB);
 
-        const rows = Array.isArray(payload) ? payload
-                   : (payload && Array.isArray(payload.items)) ? payload.items
-                   : [];
-
-        if (!rows.length){
-          cont.innerHTML = '<div class="muted">Κενό.</div>';
-          return;
-        }
-
-        cont.innerHTML = '';
-        rows.forEach(item => {
-          let urls = item.urls ?? item.urls_json ?? [];
-          if (typeof urls === 'string') {
-            try { urls = JSON.parse(urls); } catch { urls = []; }
-          }
-          if (!Array.isArray(urls)) urls = [];
-          urls = urls.filter(u => !isPlaceholderUrl(u));
-
-          const box = document.createElement('div');
-          box.className = 'card';
-
-          const media = urls.map(u => {
-            const safe = String(u || '');
-            if (safe.endsWith('.mp4')) {
-              return `<video src="${safe}" controls playsinline style="width:100%;border:1px solid var(--border);border-radius:8px;margin-top:6px"></video>`;
-            }
-            return `<img src="${safe}" style="width:100%;border:1px solid var(--border);border-radius:8px;margin-top:6px">`;
-          }).join('');
-
-          box.innerHTML = `
-            <div class="small muted">post_id: ${item.id ?? ''}</div>
-            <div class="small muted">preview_id: ${item.preview_id ?? ''}</div>
-            <div class="small muted">${item.created_at ?? ''}</div>
-            ${media || '<div class="small muted">— χωρίς media —</div>'}
-          `;
-          cont.appendChild(box);
-        });
-      }catch(err){
-        cont.innerHTML = `<div class="err small">Αποτυχία ιστορικού: ${err.message}</div>`;
-      }
-    }
-
-    function doReset() {
-      state.selectedTemplateId = null;
-      state.selectedProductId = null;
-      state.previews = [];
-      state.brandLogoUrl = null;
-      state.extraImageUrls = [];
-      $$('.template-card').forEach(x => x.classList.remove('active'));
-      $$('#productsGrid .product-card').forEach(x => x.classList.remove('active'));
-      el('productId').value = '';
-      el('brandLogo').value = '';
-      el('extraImages').value = '';
-      el('brandLogoPreview').textContent = '';
-      el('extraImagesPreview').textContent = '';
-      el('previewGrid').innerHTML = '<div class="muted">Κανένα preview ακόμα.</div>';
-      el('history').innerHTML = '<div class="muted">Κενό.</div>';
-      setStatus('Reset.', 'muted');
-      refreshCredits();
-    }
-
-    // ---- Προϊόντα από backend ----
-    const demoProducts = [
-      { id: 101, name: 'Demo Product 101' },
-      { id: 102, name: 'Demo Product 102' },
-      { id: 103, name: 'Demo Product 103' },
-      { id: 104, name: 'Demo Product 104' },
-    ];
-
-    function productThumbOf(p){
-      return p.image_url || p.image || p.thumbnail_url || p.thumb_url || '';
-    }
-
-    function renderProducts(products){
-      const grid = el('productsGrid');
-      grid.innerHTML = '';
-      if (!Array.isArray(products) || !products.length){
-        grid.innerHTML = '<div class="muted">Κανένα προϊόν.</div>';
-        return;
-      }
-      products.forEach(p => {
-        const card = document.createElement('div');
-        card.className = 'product-card';
-        card.dataset.id = p.id;
-
-        const name = p.name || p.title || ('Product ' + p.id);
-        const img = productThumbOf(p);
-
-        card.innerHTML = `
-          ${img ? `<img class="product-thumb" src="${img}" alt="${name}">` : ''}
-          <strong>#${p.id}</strong><br>
-          <span class="muted small">${name}</span>
-          <div class="spacer"></div>
-          <div class="actions product-actions">
-            <button class="btn btn-primary btn-create-image" data-id="${p.id}">Δημιουργία Εικόνας</button>
-          </div>
-        `;
-
-        card.addEventListener('click', (e) => {
-          if (e.target.closest('.btn-create-image')) return;
-          $$('#productsGrid .product-card').forEach(x => x.classList.remove('active'));
-          card.classList.add('active');
-          state.selectedProductId = p.id;
-          el('productId').value = p.id;
-          setStatus(`Επιλέχθηκε προϊόν #${p.id}`, 'ok');
-        });
-
-        grid.appendChild(card);
-      });
-
-      // bind buttons
-      $$('.btn-create-image', el('productsGrid')).forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-          e.stopPropagation();
-          const pid = btn.dataset.id;
-          if (!pid){ alert('Άγνωστο Product ID'); return; }
-          el('productId').value = pid;     // sync και με τα υπόλοιπα
-          await createImagePreview(pid, btn);
-        });
-      });
-    }
-
-    async function loadProducts(){
-      const grid = el('productsGrid');
-      grid.innerHTML = '<div class="muted">Φόρτωση…</div>';
-      const t = getToken();
-      if (!t){
-        grid.innerHTML = '<div class="err small">Δεν υπάρχει token. Πάτα "Set Token".</div>';
-        renderProducts(demoProducts);
-        return;
-      }
-      try{
-        const res = await fetch('/me/products', { headers: { Authorization: 'Bearer ' + t } });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : (Array.isArray(data.items) ? data.items : []);
-        if (!list.length){
-          grid.innerHTML = '<div class="warn small">Μηδενικά προϊόντα από backend. Δείχνω demo.</div>';
-          renderProducts(demoProducts);
-        } else {
-          renderProducts(list);
-        }
-      }catch(err){
-        grid.innerHTML = `<div class="err small">Αποτυχία φόρτωσης προϊόντων (${err.message}). Δείχνω demo.</div>`;
-        renderProducts(demoProducts);
-      }
-    }
-
-    // ---- Δημιουργία Preview από κάρτα προϊόντος (Engine flow) ----
-    async function createImagePreview(productId, btn){
-      const originalText = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = 'Δημιουργία preview…';
-      try{
-        el('productId').value = productId;
-        el('postType').value = 'image';
-        await doRender();
-      } finally {
-        btn.disabled = false;
-        btn.textContent = originalText;
-      }
-    }
-
-    // ---- Buttons / init ----
-    el('btnRender').addEventListener('click', doRender);
-    el('btnReset').addEventListener('click', doReset);
-
-    el('btnSetToken').addEventListener('click', () => {
-      const val = prompt('Δώσε JWT token (ΜΟΝΟ το token, χωρίς "Bearer ")');
-      if (!val) return;
-      localStorage.setItem('token', val.trim());
-      updateTokenState();
-      refreshCredits();
-      // μόλις μπήκε token, φόρτωσε προϊόντα
-      loadProducts();
+    $('#apw2ProductSel').addEventListener('change', (e)=>{
+      const v=e.target.value, custom=(v==='__custom');
+      const el=$('#apw2ProductCustom'); el.classList.toggle('hide', !custom);
+      if (custom) el.focus();
     });
 
-    // αρχικοποίηση
-    updateTokenState();
-    refreshCredits();
-    refreshCommitted();
-    loadProducts();
-
-    // auto-refresh κάθε 30s για credits & history (όχι products για να μην ενοχλεί)
-    setInterval(() => {
-      refreshCredits();
-      if ($('.tab.active')?.dataset.tab === 'previews') refreshCommitted();
-    }, 30000);
+    console.log('[apw2-pro] ready');
+  })();
   </script>
 </body>
 </html>
