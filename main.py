@@ -60,4 +60,6 @@ async def get_auth_html():
 
 @app.get("/dashboard2.html")
 async def get_dashboard2_html():
+    from fastapi.responses import FileResponse
+    return FileResponse("templates/dashboard.html")
     return FileResponse("templates/dashboard2.html")
