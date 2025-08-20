@@ -13,7 +13,7 @@ from services.stripe_service import (
     create_credits_checkout_session,
 )
 
-router = APIRouter()  # ΣΗΜΕΙΩΣΗ: prefix μπαίνει στο main.py: app.include_router(router, prefix="/me")
+router = APIRouter()  # prefix μπαίνει στο main.py: app.include_router(router, prefix="/me")
 
 
 # ========== PRODUCTS ==========
@@ -30,6 +30,9 @@ def sync_products(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    # ΜΗΝ ξεκινάς sync αν λείπουν creds — καθαρό 400, όχι 500.
+    if not (current_user.woocommerce_url and current_user.consumer_key and current_user.consumer_secret):
+        raise HTTPException(status_code=400, detail="Missing WooCommerce credentials")
     try:
         fetch_and_store_products_from_woocommerce(db, current_user)
         return {"message": "Products synced successfully"}
@@ -109,25 +112,19 @@ async def buy_credits(
 
 
 # ========== WOOCOMMERCE CREDENTIALS ==========
-@router.get(
-    "/woocommerce-credentials",
-    response_model=WooCommerceCredentials,
-    tags=["woocommerce"],
-)
+# ΣΗΜΑΝΤΙΚΟ: Δεν βάζουμε response_model εδώ, για να μην ρίχνει 500 όταν τα πεδία είναι None.
+@router.get("/woocommerce-credentials", tags=["woocommerce"])
 def get_woocommerce_credentials(
     current_user: User = Depends(get_current_user),
 ):
-    has_credentials = (
-        current_user.woocommerce_url is not None
-        and current_user.consumer_key is not None
-        and current_user.consumer_secret is not None
-    )
-    # Επιστρέφουμε και has_credentials για ευκολία στο UI (αν δεν το έχει ήδη το schema σου, απλά θα αγνοηθεί)
+    url = (current_user.woocommerce_url or None)
+    ck = (current_user.consumer_key or None)
+    cs = (current_user.consumer_secret or None)
+    has_credentials = bool(url and ck and cs)
+    # Για λόγους ασφάλειας δεν επιστρέφουμε τα κλειδιά. Το UI χρειάζεται μόνο το status.
     return {
-        "has_credentials": has_credentials,  # προαιρετικό πεδίο
-        "woocommerce_url": current_user.woocommerce_url,
-        "consumer_key": current_user.consumer_key,
-        "consumer_secret": current_user.consumer_secret,
+        "has_credentials": has_credentials,
+        "woocommerce_url": url if has_credentials else None,
     }
 
 
