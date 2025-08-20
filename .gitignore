@@ -49,3 +49,5 @@ review_*/
 *.tgz
 *.tar.gz
 requirements.txt.bak
+.venv/
+backups/
