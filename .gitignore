@@ -19,3 +19,33 @@ __pycache__/
 production_engine/engine.db
 static/generated/
 static/uploads/
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.cache
+*.egg-info/
+
+# Venv
+.venv/
+venv/
+
+# App generated assets
+production_engine/static/generated/*
+!production_engine/static/generated/.gitkeep
+
+# Uploads (αν υπάρχουν)
+production_engine/static/uploads/*
+!production_engine/static/uploads/.gitkeep
+
+# Local runs / reviews
+run_*/
+review_*/
+*.csv
+
+# Logs / backups
+*.log
+*.bak
+*.tgz
+*.tar.gz
+requirements.txt.bak
