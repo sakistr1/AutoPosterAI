@@ -1,3 +1,4 @@
+from production_engine.routers import tengine as tengine_router
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -18,6 +19,8 @@ except ImportError:
     import assets as _assets_module  # fallback αν έχεις assets.py στη ρίζα
 
 app = FastAPI()
+# TEngine (preview/commit)
+app.include_router(tengine_router.router)
 
 # /static πρέπει να σερβίρει τον φάκελο production_engine/static
 app.mount("/static", StaticFiles(directory="production_engine/static"), name="static")
