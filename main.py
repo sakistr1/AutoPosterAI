@@ -1,3 +1,4 @@
+from fastapi import Response
 from production_engine.routers import tengine as tengine_router
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -66,3 +67,16 @@ async def get_dashboard2_html():
     from fastapi.responses import FileResponse
     return FileResponse("templates/dashboard.html")
     return FileResponse("templates/dashboard2.html")
+
+from fastapi.responses import FileResponse
+@app.get("/dashboard_legacy.html")
+def dashboard_legacy():
+    return FileResponse("templates/dashboard_legacy.html")
+
+@app.get("/wizard.html")
+def wizard():
+    return FileResponse("templates/wizard.html")
+
+@app.head("/wizard.html")
+def wizard_head():
+    return Response(status_code=200)
