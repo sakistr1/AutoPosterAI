@@ -1,3 +1,5 @@
+from production_engine.routers import export as export_router
+from production_engine.routers import posts as posts_router
 from fastapi import Response
 from production_engine.routers import tengine as tengine_router
 from fastapi import FastAPI
@@ -20,6 +22,9 @@ except ImportError:
     import assets as _assets_module  # fallback αν έχεις assets.py στη ρίζα
 
 app = FastAPI()
+app.openapi_url = "/openapi.json"
+app.docs_url = "/docs"
+app.redoc_url = "/redoc"
 # TEngine (preview/commit)
 app.include_router(tengine_router.router)
 
@@ -80,3 +85,13 @@ def wizard():
 @app.head("/wizard.html")
 def wizard_head():
     return Response(status_code=200)
+@app.get("/posts.html")
+def posts_page():
+    return FileResponse("templates/posts.html")
+
+app.include_router(posts_router.router)
+@app.head("/posts.html")
+def posts_head():
+    return Response(status_code=200)
+
+app.include_router(export_router.router)

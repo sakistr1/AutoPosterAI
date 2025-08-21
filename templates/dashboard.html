@@ -5,7 +5,7 @@
   <title>Autoposter — Wizard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <!-- Προσθέτει Authorization header σε /me/* και /tengine/* -->
-  <script src="/static/js/authwrap.js?v=7"></script>
+  <script src="/static/js/authwrap.js?v=8"></script>
   <style>
     :root { --line:#1f2937; --muted:#94a3b8; --ok:#10b981; --err:#ef4444; --btn:#16a34a; --bg:#0b1020; --card:#0f172a; }
     *{box-sizing:border-box} body{margin:0;background:var(--bg);color:#e5e7eb;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
@@ -87,7 +87,7 @@
     <h2>Βήμα 2: Διάλεξε προϊόν</h2>
     <div class="row">
       <button class="btn secondary" onclick="syncProducts()">Sync τώρα</button>
-      <button class="btn secondary" onclick="useDemo()">Χωρίς Woo, demo προϊόν</button>
+      <button id="btnDemo" class="btn secondary" onclick="useDemo()" style="display:none">[DEV] Χωρίς Woo, demo προϊόν</button>
       <button class="btn secondary" onclick="goStep1()">← Πίσω</button>
     </div>
 
@@ -259,6 +259,10 @@
   async function goStep2(){ await loadProducts(); show('step2'); }
 
   // ------- step2 (products) -------
+  function toggleDemoButton(){
+    const b=$('btnDemo'); if(!b) return;
+    b.style.display = (Array.isArray(PRODUCTS) && PRODUCTS.length===0) ? 'inline-block' : 'none';
+  }
   async function syncProducts(){
     try{ await apiPost('/me/products/sync', {}); await loadProducts(); alert('Sync ολοκληρώθηκε'); }
     catch(e){ alert('Σφάλμα sync: '+e.message); }
@@ -266,6 +270,7 @@
   async function loadProducts(){
     const j=await apiGet('/me/products');
     PRODUCTS = Array.isArray(j)?j:(j.items||[]);
+    toggleDemoButton();
     renderCategoryButtons();
     renderProductListForCategory();
     $('focusBox').classList.add('hidden');
@@ -384,6 +389,7 @@
     if(!hasToken()){ showLogin(); return; }
     try{ await refreshCredits(); }catch{}
     try{ await loadWooIntoForm(); }catch{}
+    toggleDemoButton();
     show('step1');
   }
   init();
