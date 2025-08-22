@@ -1,141 +1,358 @@
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from typing import Optional, Literal, List
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
+from starlette.routing import Mount
 from sqlalchemy.orm import Session
-from datetime import datetime
-import os, uuid, shutil, json
+from pydantic import BaseModel
+import os, re, io, time, json, base64, secrets, uuid, shutil
+import requests
+from PIL import Image
 
 from database import get_db
 from models import User, Post
 from token_module import get_current_user
 
-router = APIRouter()
+# Template registry
+from services.template_registry import REGISTRY
 
-PE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-STATIC_DIR = os.path.join(PE_DIR, "static")
-GEN_DIR = os.path.join(STATIC_DIR, "generated")
-PREV_DIR = os.path.join(GEN_DIR, "previews")
-FINAL_DIR = os.path.join(GEN_DIR, "finals")
-os.makedirs(PREV_DIR, exist_ok=True)
-os.makedirs(FINAL_DIR, exist_ok=True)
+# Προσπάθησε να έχεις cairosvg για PNG finals
+try:
+    import cairosvg  # type: ignore
+    HAS_CAIROSVG = True
+except Exception:
+    HAS_CAIROSVG = False
 
-class PreviewBody(BaseModel):
-    post_type: Literal["image","carousel","video"] = "image"
-    mode: Literal["normal","humorous","professional"] = "normal"
-    product_id: Optional[int] = None
-    title: Optional[str] = None
-    price: Optional[str] = None
-    image_url: Optional[str] = None
-    category: Optional[str] = None
-    ratio: Optional[str] = "4:5"
+router = APIRouter(prefix="/tengine", tags=["tengine"])
 
-class CommitBody(BaseModel):
-    preview_url: str
-    post_type: Literal["image","carousel","video"] = "image"
-    product_id: Optional[int] = None
-    caption: Optional[str] = None
+# ---------- Rate limiting ----------
+from collections import deque
+_RATE_BUCKETS: dict[tuple[int, str], deque] = {}
 
-def _now_iso() -> str:
-    return datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+def _check_rate(user_id: int, bucket: str, limit: int, period_sec: int):
+    now = time.time()
+    dq = _RATE_BUCKETS.setdefault((user_id, bucket), deque())
+    while dq and now - dq[0] > period_sec:
+        dq.popleft()
+    if len(dq) >= limit:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded for {bucket} (limit={limit}/{period_sec}s)"
+        )
+    dq.append(now)
 
-def _svg_canvas(ratio: str) -> tuple[int,int]:
-    mapping = {"4:5": (1080,1350), "1:1": (1080,1080), "9:16": (1080,1920)}
-    return mapping.get(ratio or "4:5", (1080,1350))
+# ---------- Helpers ----------
+def _static_dir(app) -> str:
+    for r in app.routes:
+        try:
+            if isinstance(r, Mount) and r.path == "/static" and hasattr(r.app, "directory"):
+                return os.path.abspath(r.app.directory)
+        except Exception:
+            continue
+    raise RuntimeError("Static mount '/static' not found")
 
-def _write_preview_svg(title: str, price: Optional[str], image_url: Optional[str], mode: str, ratio: str) -> str:
-    W,H = _svg_canvas(ratio)
-    safe_title = (title or "Product").replace("&","&amp;")
-    safe_price = (price or "").replace("&","&amp;")
-    bg = "#0fbf91" if mode == "professional" else ("#16a36f" if mode == "normal" else "#0aa679")
-    uid = uuid.uuid4().hex
-    filename = f"preview_{uid}.svg"
-    fpath = os.path.join(PREV_DIR, filename)
+def _ensure_dir(p: str):
+    os.makedirs(p, exist_ok=True)
 
-    image_tag = f'<image href="{image_url}" x="60" y="140" width="{W-120}" height="{int(H*0.55)}" preserveAspectRatio="xMidYMid slice" />' if image_url else ""
-    price_tag = f'<text x="{W-60}" y="{H-60}" text-anchor="end" font-size="64" font-weight="700" fill="#ffffff">{safe_price}</text>' if safe_price else ""
-    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}">
-  <defs>
-    <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="{bg}"/>
-      <stop offset="100%" stop-color="#0b7d5a"/>
-    </linearGradient>
-  </defs>
-  <rect width="100%" height="100%" fill="url(#g1)"/>
-  <text x="60" y="96" font-size="64" font-weight="800" fill="#ffffff">{safe_title}</text>
-  {image_tag}
-  {price_tag}
-  <text x="60" y="{H-20}" font-size="22" fill="#e7fff6">Preview • {mode} • {ratio} • {_now_iso()}</text>
-</svg>'''
-    with open(fpath, "w", encoding="utf-8") as f:
+def _safe_text(s: str | None, maxlen=120) -> str:
+    if not s: return ""
+    s = re.sub(r"\s+", " ", str(s)).strip()
+    s = s[:maxlen]
+    return (s
+            .replace("&","&amp;")
+            .replace("<","&lt;")
+            .replace(">","&gt;")
+            .replace('"',"&quot;"))
+
+def _safe_hex(c: str | None, default="#0fbf91") -> str:
+    if not c: return default
+    c = c.strip()
+    if re.fullmatch(r"#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})", c):
+        return c
+    return default
+
+def _safe_url(u: str | None) -> str | None:
+    if not u: return None
+    u = u.strip()
+    if re.match(r"^https?://", u): return u
+    if u.startswith("/static/"): return u
+    if u.startswith("/assets/"): return u
+    return None
+
+def _ratio_to_size(ratio: str):
+    if ratio == "9:16": return (1080, 1920)
+    if ratio == "4:5":  return (1080, 1350)
+    return (1080, 1080)  # 1:1
+
+def _image_to_data_uri(url: str, box_w: int, box_h: int, cover=True, static_dir: str | None = None) -> str | None:
+    try:
+        if (url.startswith("/static/") or url.startswith("/assets/")) and static_dir:
+            mount = "/static/"
+            base = static_dir
+            if url.startswith("/assets/"):
+                base = os.path.abspath("assets")
+                mount = "/assets/"
+            local_path = os.path.join(base, url[len(mount):].lstrip("/"))
+            with open(local_path, "rb") as fh:
+                data = fh.read()
+        else:
+            r = requests.get(url, timeout=10)
+            r.raise_for_status()
+            data = r.content
+        im = Image.open(io.BytesIO(data)).convert("RGBA")
+        if cover:
+            rw, rh = box_w / im.width, box_h / im.height
+            scale = max(rw, rh)
+            nw, nh = int(im.width*scale), int(im.height*scale)
+            im = im.resize((nw, nh), Image.LANCZOS)
+            x = (nw - box_w)//2
+            y = (nh - box_h)//2
+            im = im.crop((x, y, x+box_w, y+box_h))
+        else:
+            rw, rh = box_w / im.width, box_h / im.height
+            scale = min(rw, rh)
+            nw, nh = max(1,int(im.width*scale)), max(1,int(im.height*scale))
+            im = im.resize((nw, nh), Image.LANCZOS)
+            bg = Image.new("RGBA", (box_w, box_h), (0,0,0,0))
+            ox = (box_w - nw)//2
+            oy = (box_h - nh)//2
+            bg.paste(im, (ox,oy), im)
+            im = bg
+        out = io.BytesIO()
+        im.save(out, format="PNG")
+        b64 = base64.b64encode(out.getvalue()).decode("ascii")
+        return f"data:image/png;base64,{b64}"
+    except Exception:
+        return None
+
+def _svg_header(w:int, h:int) -> str:
+    return f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}">'
+
+def _grad_bg(w:int, h:int, brand_color:str) -> str:
+    def darken(hexcol, pct):
+        hexcol = hexcol.lstrip("#")
+        if len(hexcol)==3:
+            hexcol = "".join([c*2 for c in hexcol])
+        r = int(hexcol[0:2],16); g=int(hexcol[2:4],16); b=int(hexcol[4:6],16)
+        r = max(0, min(255, int(r*(1-pct))))
+        g = max(0, min(255, int(g*(1-pct))))
+        b = max(0, min(255, int(b*(1-pct))))
+        return f"#{r:02x}{g:02x}{b:02x}"
+    c1 = brand_color
+    c2 = darken(brand_color, 0.35)
+    return (
+        f'<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">'
+        f'<stop offset="0%" stop-color="{c1}"/><stop offset="100%" stop-color="{c2}"/></linearGradient></defs>'
+        f'<rect x="0" y="0" width="{w}" height="{h}" fill="url(#bg)"/>'
+    )
+
+def _write_svg(meta: dict, out_path: str, is_preview: bool, static_dir: str):
+    ratio = meta.get("ratio") or "1:1"
+    W, H = _ratio_to_size(ratio)
+    title = _safe_text(meta.get("title"), 120)
+    price = _safe_text(meta.get("price"), 60)
+    image_url = meta.get("image_url") or ""
+    brand_color = _safe_hex(meta.get("brand_color") or "#0fbf91")
+    logo_url = _safe_url(meta.get("logo_url") or "") or ""
+    cta_text = _safe_text(meta.get("cta_text"), 40)
+    badge_text = _safe_text(meta.get("badge_text"), 20)
+
+    product_img = _image_to_data_uri(image_url, int(W*0.9), int(H*0.55), cover=True, static_dir=static_dir) if image_url else None
+    logo_img    = _image_to_data_uri(logo_url, 200, 80, cover=False, static_dir=static_dir) if logo_url else None
+
+    parts = [ _svg_header(W,H), _grad_bg(W,H, brand_color) ]
+
+    if product_img:
+        parts.append(f'<image href="{product_img}" x="{int(W*0.05)}" y="{int(H*0.12)}" width="{int(W*0.9)}" height="{int(H*0.55)}" />')
+    if title:
+        parts.append(f'<text x="{W//2}" y="{int(H*0.76)}" text-anchor="middle" font-family="system-ui,Segoe UI,Roboto" font-size="{int(H*0.06)}" fill="#ffffff" font-weight="700">{title}</text>')
+    if price:
+        parts.append(f'<text x="{W//2}" y="{int(H*0.86)}" text-anchor="middle" font-family="system-ui,Segoe UI,Roboto" font-size="{int(H*0.05)}" fill="#ffffff" font-weight="600">{price}</text>')
+    if badge_text:
+        parts.append(f'<rect x="{int(W*0.05)}" y="{int(H*0.05)}" rx="14" ry="14" width="220" height="44" fill="#ffffffaa"/><text x="{int(W*0.05)+110}" y="{int(H*0.05)+30}" text-anchor="middle" font-family="system-ui" font-size="20" fill="#111">{badge_text}</text>')
+    if cta_text:
+        parts.append(f'<rect x="{int(W*0.65)}" y="{int(H*0.89)}" rx="12" ry="12" width="{int(W*0.28)}" height="42" fill="#ffffff"/>'
+                     f'<text x="{int(W*0.65)+int(W*0.14)}" y="{int(H*0.89)+28}" text-anchor="middle" font-family="system-ui" font-size="20" fill="#111">{cta_text}</text>')
+    if logo_img:
+        parts.append(f'<image href="{logo_img}" x="{int(W*0.05)}" y="{int(H*0.88)}" width="200" height="80" />')
+
+    if is_preview:
+        parts.append(f'<text x="{W-8}" y="{H-8}" text-anchor="end" font-family="system-ui" font-size="12" fill="#ffffffaa">Preview</text>')
+
+    parts.append('</svg>')
+    svg = "".join(parts)
+    _ensure_dir(os.path.dirname(out_path))
+    with open(out_path, "w", encoding="utf-8") as f:
         f.write(svg)
-    rel = os.path.relpath(fpath, STATIC_DIR).replace(os.sep, "/")
-    return f"/static/{rel}"
 
-def _copy_to_finals(preview_url: str) -> str:
-    if not preview_url.startswith("/static/generated/previews/"):
+def _normalize_preview_url_to_static_path(preview_url: str) -> str:
+    if not preview_url:
+        raise HTTPException(status_code=400, detail="preview_url is required")
+    from urllib.parse import urlparse
+    parsed = urlparse(preview_url)
+    path = parsed.path if parsed.scheme else preview_url
+    if not path.startswith("/"):
+        path = "/" + path
+    return path
+
+# --- ΝΕΟ: render finals (PNG αν υπάρχει cairosvg, αλλιώς SVG copy) ---
+def _final_from_preview(preview_static_path: str, static_dir: str) -> str:
+    if not preview_static_path.startswith("/static/generated/previews/"):
         raise HTTPException(status_code=400, detail="Invalid preview_url")
-    src = os.path.join(STATIC_DIR, preview_url.replace("/static/", "").replace("/", os.sep))
+
+    src = os.path.join(static_dir, preview_static_path.replace("/static/", "").lstrip("/").replace("/", os.sep))
     if not os.path.isfile(src):
         raise HTTPException(status_code=404, detail="Preview file not found")
+
+    finals_dir = os.path.join(static_dir, "generated", "finals")
+    _ensure_dir(finals_dir)
+
     uid = uuid.uuid4().hex
-    dst = os.path.join(FINAL_DIR, f"final_{uid}.svg")
-    shutil.copyfile(src, dst)
-    rel = os.path.relpath(dst, STATIC_DIR).replace(os.sep, "/")
-    return f"/static/{rel}"
+    if HAS_CAIROSVG:
+        # PNG render
+        final_name = f"final_{uid}.png"
+        dst = os.path.join(finals_dir, final_name)
+        try:
+            svg_text = open(src, "r", encoding="utf-8").read()
+        except UnicodeDecodeError:
+            svg_text = open(src, "r", encoding="latin-1", errors="ignore").read()
+        cairosvg.svg2png(bytestring=svg_text.encode("utf-8"), write_to=dst)
+        rel = os.path.relpath(dst, static_dir).replace(os.sep, "/")
+        return f"/static/{rel}"
+    else:
+        # Fallback: SVG copy
+        final_name = f"final_{uid}.svg"
+        dst = os.path.join(finals_dir, final_name)
+        shutil.copyfile(src, dst)
+        rel = os.path.relpath(dst, static_dir).replace(os.sep, "/")
+        return f"/static/{rel}"
 
-@router.post("/tengine/preview")
-def tengine_preview(body: PreviewBody, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    title = body.title
-    price = body.price
-    image_url = body.image_url
-    if body.product_id:
-        prod = db.execute(
-            "SELECT name, price, image_url FROM products WHERE id = :pid AND owner_id = :uid",
-            {"pid": body.product_id, "uid": current_user.id}
-        ).fetchone()
-        if not prod:
-            raise HTTPException(status_code=404, detail="product not found")
-        title = title or prod[0]
-        price = price or (prod[1] or "")
-        image_url = image_url or (prod[2] or "")
-    preview_url = _write_preview_svg(title or "Product", price, image_url, body.mode, body.ratio or "4:5")
-    return {"preview_url": preview_url}
+# ---------- Schemas ----------
+class PreviewIn(BaseModel):
+    post_type: str = "image"
+    mode: str | None = None
+    ratio: str = "1:1"
+    title: str | None = None
+    price: str | None = None
+    image_url: str | None = None
+    brand_color: str | None = None
+    logo_url: str | None = None
+    cta_text: str | None = None
+    cta_url: str | None = None
+    badge_text: str | None = None
+    template_id: str | None = None  # render μέσω registry αν δοθεί
 
-@router.post("/tengine/commit")
-def tengine_commit(body: CommitBody, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    # Έλεγχος credits
+class CommitIn(BaseModel):
+    preview_url: str
+    post_type: str = "image"
+    product_id: int | None = None
+    caption: str | None = None
+
+# ---------- Endpoints ----------
+@router.post("/preview")
+def preview(req: Request, payload: PreviewIn, current_user: User = Depends(get_current_user)):
+    _check_rate(current_user.id, "preview", limit=12, period_sec=60)
+    static_dir = _static_dir(req.app)
+    prev_dir = os.path.join(static_dir, "generated", "previews")
+    _ensure_dir(prev_dir)
+
+    pid = secrets.token_hex(16)
+    svg_name = f"preview_{pid}.svg"
+    svg_path = os.path.join(prev_dir, svg_name)
+
+    # render μέσω registry όταν έχει template_id
+    if payload.template_id:
+        try:
+            rec = REGISTRY.get(payload.template_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="Unknown template_id")
+
+        ratio = payload.ratio or None
+        incoming = {
+            "title": payload.title,
+            "price": payload.price,
+            "image_url": payload.image_url,
+            "brand_color": payload.brand_color,
+            "badge_text": payload.badge_text,
+            "cta_text": payload.cta_text,
+            "cta_url": payload.cta_url,
+            "logo": payload.logo_url,  # map
+        }
+        incoming = {k: v for k, v in incoming.items() if v not in (None, "")}
+
+        try:
+            context, warnings = REGISTRY.validate_and_merge(rec, incoming, ratio)
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+
+        svg = REGISTRY.render_svg(rec, context)
+        with open(svg_path, "w", encoding="utf-8") as f:
+            f.write(svg)
+
+        # meta για debug
+        meta = {
+            "template_id": payload.template_id,
+            "ratio": context.get("ratio"),
+            "payload": incoming,
+            "_meta": {"version": "v3", "created_ts": time.time(), "user_id": current_user.id}
+        }
+        with open(os.path.join(prev_dir, f"meta_{pid}.json"), "w", encoding="utf-8") as f:
+            json.dump(meta, f, ensure_ascii=False)
+
+        return {
+            "preview_url": f"/static/generated/previews/{svg_name}",
+            "warnings": warnings,
+            "template_id": payload.template_id,
+            "ratio": context.get("ratio")
+        }
+
+    # ------ Fallback: απλός renderer χωρίς template_id ------
+    meta = payload.dict()
+    meta["ratio"] = (meta.get("ratio") or "1:1")
+    meta["brand_color"] = _safe_hex(meta.get("brand_color"))
+    meta["title"] = _safe_text(meta.get("title") or "Autoposter", 120)
+    meta["price"] = _safe_text(meta.get("price") or "", 60)
+    meta["image_url"] = meta.get("image_url") or ""
+    meta["logo_url"] = meta.get("logo_url") or ""
+    meta["cta_text"] = _safe_text(meta.get("cta_text") or "", 40)
+    meta["cta_url"] = meta.get("cta_url") or ""
+    meta["badge_text"] = _safe_text(meta.get("badge_text") or "", 20)
+    meta["_meta"] = {"version": "v3", "created_ts": time.time(), "user_id": current_user.id}
+
+    with open(os.path.join(prev_dir, f"meta_{pid}.json"), "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False)
+
+    _write_svg(meta, svg_path, is_preview=True, static_dir=static_dir)
+    return {"preview_url": f"/static/generated/previews/{svg_name}"}
+
+@router.post("/commit")
+def commit(req: Request, body: CommitIn, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _check_rate(current_user.id, "commit", limit=20, period_sec=3600)
+
     if current_user.credits is None or current_user.credits < 1:
         raise HTTPException(status_code=402, detail="Not enough credits")
+    # χρέωση πρώτα (debounce spam)
+    current_user.credits -= 1
+    db.add(current_user); db.commit(); db.refresh(current_user)
 
-    # Αντιγραφή preview -> final
-    final_url = _copy_to_finals(body.preview_url)
-    media_urls: List[str] = [final_url]
+    static_dir = _static_dir(req.app)
+    normalized_path = _normalize_preview_url_to_static_path(body.preview_url)
+    final_url = _final_from_preview(normalized_path, static_dir)  # PNG by default
 
-    # ΠΕΔΙΑ ΠΟΥ ΕΙΝΑΙ NOT NULL ΣΤΗ DB
-    title_val = "Autoposter Post"
-    if body.product_id:
-        prod = db.execute(
-            "SELECT name FROM products WHERE id = :pid AND owner_id = :uid",
-            {"pid": body.product_id, "uid": current_user.id}
-        ).fetchone()
-        if prod and prod[0]:
-            title_val = prod[0]
-    content_val = body.caption or f"Generated on {_now_iso()} • media: {final_url}"
-
-    # Δημιουργία Post και χρέωση credit σε μία συναλλαγή
+    media_urls = [final_url]
     post = Post(
-        title=title_val,
-        content=content_val,
-        owner_id=current_user.id,
         product_id=body.product_id,
         type=body.post_type,
         media_urls=json.dumps(media_urls),
+        owner_id=current_user.id,
     )
-    db.add(post)
-    current_user.credits -= 1
-    db.add(current_user)
+    if hasattr(Post, "caption") and body.caption is not None:
+        try: setattr(post, "caption", body.caption)
+        except Exception: pass
+    if hasattr(Post, "content"):
+        try: setattr(post, "content", body.caption or "")
+        except Exception: pass
+    if hasattr(Post, "title") and getattr(post, "title", None) is None:
+        try: setattr(post, "title", "Autoposter Image")
+        except Exception: pass
 
-    db.commit()
-    db.refresh(post)
-
+    db.add(post); db.commit(); db.refresh(post)
     return {"post_id": post.id, "media_urls": media_urls, "credits_left": current_user.credits}

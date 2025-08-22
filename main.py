@@ -1,97 +1,71 @@
-from production_engine.routers import export as export_router
-from production_engine.routers import posts as posts_router
-from fastapi import Response
-from production_engine.routers import tengine as tengine_router
-from fastapi import FastAPI
+# main.py — include routers από routers.* ΚΑΙ production_engine.routers.*
+from fastapi import FastAPI, Request, APIRouter
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from importlib import import_module
 
-# Υπάρχοντες routers από το κύριο app
-from routers import users, auth, me, dashboard, templates
+app = FastAPI(title="Autoposter AI")
 
-# previews ζει στο production_engine/routers
-from production_engine.routers import previews
-from production_engine.routers import templates_engine as tengine  # ✅ ΠΡΟΣΘΗΚΗ
-
-# assets: κάνε import απ’ όπου κι αν το έχεις (production_engine/routers ή ρίζα)
-try:
-    from production_engine.routers import assets as _assets_module  # προτιμώμενο
-except ImportError:
-    import assets as _assets_module  # fallback αν έχεις assets.py στη ρίζα
-
-app = FastAPI()
-app.openapi_url = "/openapi.json"
-app.docs_url = "/docs"
-app.redoc_url = "/redoc"
-# TEngine (preview/commit)
-app.include_router(tengine_router.router)
-
-# /static πρέπει να σερβίρει τον φάκελο production_engine/static
+# Static & Templates
 app.mount("/static", StaticFiles(directory="production_engine/static"), name="static")
+# ΝΕΟ: σερβίρουμε τα αρχεία templates (thumbs κ.λπ.)
+app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
-templates_env = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory="templates")
 
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # σφίγγεις αργότερα
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+# ---------------- HTML pages ----------------
+@app.get("/dashboard.html", response_class=HTMLResponse)
+async def dashboard_html(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+@app.get("/auth.html", response_class=HTMLResponse)
+async def auth_html(request: Request):
+    return templates.TemplateResponse("auth.html", {"request": request})
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_alias(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
+
+@app.get("/", include_in_schema=False)
+async def root_redirect():
+    return RedirectResponse(url="/dashboard.html")
+
+# ------------- Dynamic include routers (με dedupe, 2 namespaces) -------------
+def include_all_routers(module_name: str, seen_ids: set[int], namespace: str):
+    """
+    Κάνει import <namespace>.<module_name> και κάνει include ΚΑΘΕ attribute που είναι APIRouter.
+    """
+    try:
+        mod = import_module(f"{namespace}.{module_name}")
+    except Exception:
+        return
+    for attr in dir(mod):
+        obj = getattr(mod, attr)
+        if isinstance(obj, APIRouter):
+            oid = id(obj)
+            if oid in seen_ids:
+                continue
+            app.include_router(obj)
+            seen_ids.add(oid)
+
+seen: set[int] = set()
+
+# modules που μας νοιάζουν
+modules = (
+    "auth", "users", "me", "tengine", "dashboard", "templates",
+    "products", "posts", "sync", "mock_woocommerce",
 )
 
-# Routers (κύριο app)
-app.include_router(users.router, prefix="/users")
-app.include_router(auth.router, prefix="/auth")
-app.include_router(me.router, prefix="/me")
-app.include_router(dashboard.router, prefix="/dashboard")
-app.include_router(templates.router)
+# ψάξε πρώτα στο παλιό namespace
+for name in modules:
+    include_all_routers(name, seen, "routers")
 
-# Routers (production_engine + assets)
-app.include_router(previews.router)
-app.include_router(_assets_module.router, prefix="/assets")
-app.include_router(tengine.router)  # ✅ ΠΡΟΣΘΗΚΗ
+# και μετά στο production_engine.routers (εκεί βρίσκεται ο tengine)
+for name in modules:
+    include_all_routers(name, seen, "production_engine.routers")
 
-@app.get("/")
-async def root():
-    return {"message": "AutoPoster AI is running"}
-
-# HTML endpoints
-@app.get("/dashboard.html")
-async def get_dashboard_html():
-    return FileResponse("templates/dashboard.html")
-
-@app.get("/auth.html")
-async def get_auth_html():
-    return FileResponse("templates/auth.html")
-
-@app.get("/dashboard2.html")
-async def get_dashboard2_html():
-    from fastapi.responses import FileResponse
-    return FileResponse("templates/dashboard.html")
-    return FileResponse("templates/dashboard2.html")
-
-from fastapi.responses import FileResponse
-@app.get("/dashboard_legacy.html")
-def dashboard_legacy():
-    return FileResponse("templates/dashboard_legacy.html")
-
-@app.get("/wizard.html")
-def wizard():
-    return FileResponse("templates/wizard.html")
-
-@app.head("/wizard.html")
-def wizard_head():
-    return Response(status_code=200)
-@app.get("/posts.html")
-def posts_page():
-    return FileResponse("templates/posts.html")
-
-app.include_router(posts_router.router)
-@app.head("/posts.html")
-def posts_head():
-    return Response(status_code=200)
-
-app.include_router(export_router.router)
+# Υγεία
+@app.get("/healthz", include_in_schema=False)
+async def healthz():
+    return {"ok": True}

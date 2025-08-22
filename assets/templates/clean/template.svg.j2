@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350">
+  <defs>
+    <style>
+      .title { font: 700 72px sans-serif; fill: #111827; }
+      .price { font: 700 64px sans-serif; fill: {{ brand_color }}; }
+      .cta   { font: 600 40px sans-serif; fill: #ffffff; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1080" height="1350" fill="#ffffff"/>
+
+  <!-- IMAGE BBOX ΓΙΑ MAP -->
+  <rect x="90" y="120" width="900" height="900"
+        data-slot="image:image_url" data-fit="contain"/>
+  <!-- Πραγματική εικόνα -->
+  <image id="productImage" href="{{ image_url }}" x="90" y="120" width="900" height="900" preserveAspectRatio="xMidYMid meet"/>
+
+  <!-- TITLE SLOT -->
+  <text x="540" y="1080" text-anchor="middle" class="title"
+        data-slot="text:title" data-width="960" data-align="middle" data-max-lines="2" data-line-height="1.1">
+    {{ title }}
+  </text>
+
+  <!-- PRICE SLOT -->
+  <text x="540" y="1170" text-anchor="middle" class="price"
+        data-slot="text:price" data-width="960" data-align="middle" data-max-lines="1">
+    {{ price }}
+  </text>
+
+  <rect x="390" y="1210" rx="14" ry="14" width="300" height="70" fill="{{ brand_color }}"/>
+  <text id="ctaText" x="540" y="1260" text-anchor="middle" class="cta">{{ cta_text }}</text>
+</svg>

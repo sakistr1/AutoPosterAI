@@ -1,79 +1,38 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from typing import List
+from fastapi import APIRouter, HTTPException
+from services.template_registry import REGISTRY
 
-from database import get_db
-from models import Template, User
-from schemas import TemplateCreate, TemplateOut
-from token_module import get_current_user
+router = APIRouter(prefix="/templates", tags=["templates"])
 
-router = APIRouter(
-    prefix="/templates",
-    tags=["templates"],
-    responses={404: {"description": "Not found"}},
-)
+@router.get("")
+def list_templates():
+    return REGISTRY.list_public()
 
-@router.get("/test")
-def test():
-    return {"message": "Templates router is active"}
-
-@router.post("/", response_model=TemplateOut, status_code=status.HTTP_201_CREATED)
-def create_template(
-    template_in: TemplateCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    # Αν δεν δίνει owner_id, το βάζουμε αυτόματα από τον τρέχοντα χρήστη
-    owner_id = template_in.owner_id or current_user.id
-
-    db_template = Template(
-        name=template_in.name,
-        type=template_in.type,
-        file_path=template_in.file_path,
-        owner_id=owner_id,
-    )
-    db.add(db_template)
-    db.commit()
-    db.refresh(db_template)
-    return db_template
-
-
-@router.get("/", response_model=List[TemplateOut])
-def list_templates(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    # Επιστρέφει μόνο τα templates του χρήστη
-    templates = db.query(Template).filter(Template.owner_id == current_user.id).all()
-    return templates
-
-
-@router.get("/{template_id}", response_model=TemplateOut)
-def get_template(
-    template_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    template = db.query(Template).filter(
-        Template.id == template_id, Template.owner_id == current_user.id
-    ).first()
-    if not template:
+@router.get("/{template_id}")
+def get_template(template_id: str):
+    try:
+        rec = REGISTRY.get(template_id)
+    except KeyError:
         raise HTTPException(status_code=404, detail="Template not found")
-    return template
+    return {
+        "id": rec.meta.id,
+        "name": rec.meta.name,
+        "version": rec.meta.version,
+        "ratios": rec.meta.ratios,
+        "fields": {
+            k: {
+                "type": v.type,
+                "required": v.required,
+                "max_chars": v.max_chars,
+                "default": v.default,
+                "format": v.format,
+            } for k, v in rec.meta.fields.items()
+        },
+        "render": rec.meta.render,
+        "thumb_url": REGISTRY.get_thumb_url(rec),
+        "map": REGISTRY.get_map(rec),
+    }
 
-
-@router.delete("/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_template(
-    template_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    template = db.query(Template).filter(
-        Template.id == template_id, Template.owner_id == current_user.id
-    ).first()
-    if not template:
-        raise HTTPException(status_code=404, detail="Template not found")
-
-    db.delete(template)
-    db.commit()
-    return None
+@router.post("/reload")
+def reload_templates():
+    REGISTRY.reload()
+    return {"ok": True, "count": len(REGISTRY.list_public())}

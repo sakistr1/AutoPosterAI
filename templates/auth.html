@@ -1,144 +1,187 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="el">
 <head>
-    <meta charset="UTF-8" />
-    <title>Σύνδεση / Εγγραφή - Autopost AI</title>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500&display=swap" rel="stylesheet" />
-    <style>
-        body {
-            font-family: 'Montserrat', sans-serif;
-            background-color: #f0fdf4;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        .card {
-            background-color: #ffffff;
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            width: 320px;
-            text-align: center;
-        }
-        h2 {
-            color: #047857;
-            margin-bottom: 1rem;
-        }
-        input[type="email"], input[type="password"], input[type="text"] {
-            width: 100%;
-            padding: 0.75rem;
-            margin: 0.5rem 0;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-            font-size: 1rem;
-        }
-        button {
-            width: 100%;
-            padding: 0.75rem;
-            background-color: #10b981;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            cursor: pointer;
-            margin-top: 1rem;
-        }
-        button:hover {
-            background-color: #059669;
-        }
-        .link {
-            display: block;
-            margin-top: 1rem;
-            font-size: 0.9rem;
-            cursor: pointer;
-            color: #047857;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Σύνδεση / Εγγραφή — AutoPoster</title>
+  <style>
+    :root{color-scheme:dark}
+    body{margin:0;background:#0e131a;color:#e6eef8;font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial}
+    .wrap{min-height:100dvh;display:grid;place-items:center;padding:24px}
+    .card{width:100%;max-width:520px;background:#121826;border:1px solid #1e293b;border-radius:16px;padding:24px 22px;box-shadow:0 10px 30px #0008}
+    h1{margin:0 0 14px;font-size:22px}
+    .tabs{display:flex;gap:8px;margin-bottom:16px}
+    .tabs button{flex:1;padding:10px 12px;border-radius:10px;border:1px solid #1f2937;background:#0f172a;color:#e5e7eb;cursor:pointer}
+    .tabs button.active{background:#16a34a;border-color:#16a34a}
+    form{display:grid;gap:10px}
+    label{font-size:13px;opacity:.9}
+    input{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #334155;background:#0b1220;color:#e6eef8}
+    .row{display:grid;gap:10px}
+    .actions{display:flex;gap:10px;margin-top:6px}
+    .btn{padding:10px 12px;border-radius:10px;border:1px solid #334155;background:#0b1220;color:#e6eef8;cursor:pointer}
+    .btn.primary{background:#16a34a;border-color:#16a34a;color:#041b07;font-weight:600}
+    .msg{margin-top:10px;font-size:14px}
+    .msg.error{color:#f87171}
+    .msg.ok{color:#34d399}
+    small.hint{opacity:.7}
+  </style>
 </head>
 <body>
-    <div class="card">
-        <h2 id="form-title">Σύνδεση</h2>
-        <div id="login-form">
-            <input type="email" id="login-email" placeholder="Email" />
-            <input type="password" id="login-password" placeholder="Κωδικός" />
-            <button onclick="login()">Σύνδεση</button>
-            <div class="link" onclick="toggleForms()">Δεν έχεις λογαριασμό; Κάνε εγγραφή</div>
-        </div>
+<div class="wrap">
+  <div class="card">
+    <h1>Σύνδεση / Εγγραφή</h1>
 
-        <div id="register-form" style="display:none;">
-            <input type="text" id="register-username" placeholder="Username" />
-            <input type="email" id="register-email" placeholder="Email" />
-            <input type="password" id="register-password" placeholder="Κωδικός" />
-            <button onclick="register()">Εγγραφή</button>
-            <div class="link" onclick="toggleForms()">Έχεις ήδη λογαριασμό; Σύνδεση</div>
-        </div>
+    <div class="tabs">
+      <button id="tab-login" class="active" type="button">Σύνδεση</button>
+      <button id="tab-register" type="button">Εγγραφή</button>
     </div>
 
-    <script>
-        function toggleForms() {
-            const loginForm = document.getElementById('login-form');
-            const registerForm = document.getElementById('register-form');
-            const formTitle = document.getElementById('form-title');
-            if (loginForm.style.display === 'none') {
-                loginForm.style.display = 'block';
-                registerForm.style.display = 'none';
-                formTitle.textContent = 'Σύνδεση';
-            } else {
-                loginForm.style.display = 'none';
-                registerForm.style.display = 'block';
-                formTitle.textContent = 'Εγγραφή';
-            }
-        }
+    <!-- LOGIN -->
+    <form id="form-login" autocomplete="on">
+      <div class="row">
+        <label>email</label>
+        <input id="login-email" type="email" required placeholder="demo12@gmail.com" />
+      </div>
+      <div class="row">
+        <label>password</label>
+        <input id="login-pass" type="password" required placeholder="••••••" />
+      </div>
+      <div class="actions">
+        <button class="btn" type="button" id="btn-check">Έλεγχος token</button>
+        <button class="btn primary" type="submit">Login</button>
+      </div>
+      <div class="msg" id="login-msg"></div>
+    </form>
 
-        async function login() {
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
+    <!-- REGISTER -->
+    <form id="form-register" style="display:none">
+      <div class="row">
+        <label>email</label>
+        <input id="reg-email" type="email" required placeholder="email@domain.tld" />
+      </div>
+      <div class="row">
+        <label>username <small class="hint">(προαιρετικό — μπορεί να είναι ίδιο με το email)</small></label>
+        <input id="reg-username" type="text" placeholder="π.χ. demo12" />
+      </div>
+      <div class="row">
+        <label>password</label>
+        <input id="reg-pass" type="password" required placeholder="••••••" />
+      </div>
+      <div class="actions">
+        <button class="btn" type="button" id="btn-back">Πίσω</button>
+        <button class="btn primary" type="submit">Εγγραφή</button>
+      </div>
+      <div class="msg" id="reg-msg"></div>
+    </form>
 
-            const formData = new URLSearchParams();
-            formData.append('username', email);  // backend περιμένει "username"
-            formData.append('password', password);
+  </div>
+</div>
 
-            const response = await fetch("/auth/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: formData.toString()
-            });
+<script>
+const BASE = location.origin;
+const TOKEN_KEY = 'autoposter_token';
+const NEXT = new URLSearchParams(location.search).get('next') || '/dashboard.html';
 
-            if (response.ok) {
-                const data = await response.json();
-                localStorage.setItem("token", data.access_token);
-                setTimeout(() => {
-                    if (localStorage.getItem("token")) {
-                        window.location.href = "/dashboard.html";
-                    } else {
-                        alert("Σφάλμα στην αποθήκευση του token.");
-                    }
-                }, 300);
-            } else {
-                alert("Λάθος email ή κωδικός.");
-            }
-        }
+const $ = (s) => document.querySelector(s);
+const setMsg = (el, text, ok=false) => {
+  el.textContent = text || '';
+  el.className = 'msg ' + (text ? (ok ? 'ok' : 'error') : '');
+};
 
-        async function register() {
-            const username = document.getElementById('register-username').value;
-            const email = document.getElementById('register-email').value;
-            const password = document.getElementById('register-password').value;
+// tabs
+$('#tab-login').onclick = () => {
+  $('#tab-login').classList.add('active');
+  $('#tab-register').classList.remove('active');
+  $('#form-login').style.display = '';
+  $('#form-register').style.display = 'none';
+  setMsg($('#login-msg'), '');
+};
+$('#tab-register').onclick = () => {
+  $('#tab-register').classList.add('active');
+  $('#tab-login').classList.remove('active');
+  $('#form-register').style.display = '';
+  $('#form-login').style.display = 'none';
+  setMsg($('#reg-msg'), '');
+};
+$('#btn-back').onclick = () => $('#tab-login').onclick();
 
-            const response = await fetch("/auth/register", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ username, email, password })
-            });
+// LOGIN: /login (form-url-encoded) με username = email
+$('#form-login').onsubmit = async (e) => {
+  e.preventDefault();
+  setMsg($('#login-msg'), 'Γίνεται σύνδεση…', true);
 
-            if (response.ok) {
-                alert("Επιτυχής εγγραφή! Μπορείς να συνδεθείς.");
-                toggleForms();
-            } else {
-                const error = await response.json();
-                alert("Σφάλμα κατά την εγγραφή: " + (error.detail || ''));
-            }
-        }
-    </script>
+  const email = $('#login-email').value.trim();
+  const password = $('#login-pass').value;
+
+  const body = new URLSearchParams();
+  body.set('username', email);      // backend θέλει email στο πεδίο 'username'
+  body.set('password', password);
+
+  try {
+    const res = await fetch(`${BASE}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/x-www-form-urlencoded' },
+      body
+    });
+    const data = await res.json();
+    if (!res.ok) { setMsg($('#login-msg'), data.detail || 'Login failed'); return; }
+    localStorage.setItem(TOKEN_KEY, data.access_token);
+    setMsg($('#login-msg'), 'Επιτυχής σύνδεση!', true);
+    location.href = NEXT;
+  } catch (err) {
+    setMsg($('#login-msg'), err.message || 'Network error');
+  }
+};
+
+// REGISTER: /register (JSON)
+$('#form-register').onsubmit = async (e) => {
+  e.preventDefault();
+  setMsg($('#reg-msg'), 'Δημιουργία λογαριασμού…', true);
+
+  const email = $('#reg-email').value.trim();
+  const username = ($('#reg-username').value.trim() || email);
+  const password = $('#reg-pass').value;
+
+  try {
+    const res = await fetch(`${BASE}/register`, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ email, username, password })
+    });
+    const data = await res.json();
+
+    if (!res.ok) { setMsg($('#reg-msg'), data.detail || 'Registration failed'); return; }
+    setMsg($('#reg-msg'), 'Ο λογαριασμός δημιουργήθηκε. Κάνε login!', true);
+    // auto-fill το login form
+    $('#login-email').value = email;
+    $('#login-pass').value = password;
+    $('#tab-login').onclick();
+  } catch (err) {
+    setMsg($('#reg-msg'), err.message || 'Network error');
+  }
+};
+
+// Quick check token/credits
+$('#btn-check').onclick = async () => {
+  const token = localStorage.getItem(TOKEN_KEY) || '';
+  if (!token) { setMsg($('#login-msg'), 'Δεν υπάρχει token αποθηκευμένο'); return; }
+  try {
+    const res = await fetch(`${BASE}/me/credits`, { headers: { 'Authorization': `Bearer ${token}` } });
+    const data = await res.json();
+    if (!res.ok) { setMsg($('#login-msg'), JSON.stringify(data)); return; }
+    setMsg($('#login-msg'), `OK · credits: ${data.credits}`, true);
+  } catch (e) { setMsg($('#login-msg'), e.message); }
+};
+
+// Αν υπάρχει ήδη έγκυρο token, πήγαινε κατευθείαν στο NEXT
+(async () => {
+  const tok = localStorage.getItem(TOKEN_KEY);
+  if (!tok) return;
+  try {
+    const res = await fetch(`${BASE}/me/credits`, { headers:{Authorization:`Bearer ${tok}`} });
+    if (res.ok) location.href = NEXT;
+  } catch {}
+})();
+</script>
 </body>
 </html>

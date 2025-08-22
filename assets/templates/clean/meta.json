@@ -1,0 +1,22 @@
+{
+  "id": "clean",
+  "name": "Clean Promo",
+  "version": "1.0.0",
+  "ratios": ["4:5", "1:1"],
+  "fields": {
+    "title":      {"type":"text","required":true,"max_chars":50},
+    "price":      {"type":"price","required":true,"format":"€{value}"},
+    "image_url":  {"type":"image","required":true},
+    "brand_color":{"type":"color","required":false,"default":"#111827"},
+    "cta_text":   {"type":"text","required":false,"default":"Buy now"}
+  },
+  "render": {
+    "selectors": {
+      "title": "#title",
+      "price": "#price",
+      "image": "#productImage",
+      "brand": "#brandAccent",
+      "cta":   "#ctaText"
+    }
+  }
+}

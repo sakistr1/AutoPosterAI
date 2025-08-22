@@ -1,17 +1,23 @@
 from pydantic import BaseModel, HttpUrl, EmailStr
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 from datetime import datetime
 
+
+# ----------------- Woo / Billing -----------------
 
 class WooCommerceCredentials(BaseModel):
     woocommerce_url: str
     consumer_key: str
     consumer_secret: str
+    # προαιρετικό, το χρησιμοποιεί το UI σου
+    sync_url: Optional[str] = None
 
 
 class CreateCheckoutSessionRequest(BaseModel):
     plan_id: str
 
+
+# ----------------- Users -----------------
 
 class UserBase(BaseModel):
     email: EmailStr
@@ -31,9 +37,11 @@ class UserOut(UserBase):
     id: int
     is_active: bool
     credits: int
-    woocommerce_url: Optional[str]
-    consumer_key: Optional[str]
-    consumer_secret: Optional[str]
+    woocommerce_url: Optional[str] = None
+    consumer_key: Optional[str] = None
+    consumer_secret: Optional[str] = None
+    # για να μην “σκάει” όταν το επιστρέφεις
+    sync_url: Optional[str] = None
 
     class Config:
         orm_mode = True
@@ -43,12 +51,15 @@ class UserUpdateWoocommerce(BaseModel):
     woocommerce_url: str
     consumer_key: str
     consumer_secret: str
+    sync_url: Optional[str] = None
 
 
 class Token(BaseModel):
     access_token: str
     token_type: str
 
+
+# ----------------- Products / Posts -----------------
 
 class ProductBase(BaseModel):
     name: str
@@ -96,12 +107,12 @@ class CreditResponse(BaseModel):
     remaining_credits: int
 
 
-# ----------- ΝΕΑ SCHEMAS ΓΙΑ TEMPLATES -----------
+# ----------------- Templates (DB-side) -----------------
 
 class TemplateBase(BaseModel):
-    name: str
-    type: str  # image, carousel, video
-    file_path: str
+    name: str           # internal name
+    type: str           # image | carousel | video
+    file_path: str      # filesystem path
 
 
 class TemplateCreate(TemplateBase):
@@ -116,3 +127,38 @@ class TemplateOut(TemplateBase):
 
     class Config:
         orm_mode = True
+
+
+# ----------------- Template Engine (API requests) -----------------
+# Τα παρακάτω βοηθούν να κρατάς το schema σε ένα σημείο
+# και να μην “σπάει” με relative preview_url.
+
+class TEnginePreviewRequest(BaseModel):
+    """
+    Preview αίτημα. Κρατάμε το schema χαλαρό γιατί το UI
+    είτε στέλνει template_id/params είτε (ratio/mode/title/price…).
+    """
+    # Path A: άμεσο template render
+    template_id: Optional[str] = None
+    product_id: Optional[int] = None
+    params: Optional[Dict[str, Any]] = None
+
+    # Path B: wizard-friendly fields (όπως στέλνει το dashboard)
+    post_type: Optional[str] = None
+    mode: Optional[str] = None
+    ratio: Optional[str] = None
+    title: Optional[str] = None
+    price: Optional[str] = None
+    image_url: Optional[str] = None  # δέξου και μη-HttpUrl (π.χ. data URL)
+
+
+class TEngineCommitRequest(BaseModel):
+    """
+    Commit αίτημα. Σημαντικό: preview_url = str (όχι HttpUrl)
+    ώστε να επιτρέπονται και relative paths (/static/...).
+    """
+    template_id: Optional[str] = None
+    product_id: Optional[int] = None
+    preview_url: str
+    caption: Optional[str] = None
+    post_type: Optional[str] = None

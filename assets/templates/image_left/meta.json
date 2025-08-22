@@ -1,0 +1,27 @@
+{
+  "id": "image_left",
+  "name": "Portrait Left",
+  "version": "1.0.0",
+  "ratios": ["4:5", "9:16"],
+  "fields": {
+    "title":      {"type":"text","required":true,"max_chars":40},
+    "price":      {"type":"price","required":true,"format":"€{value}"},
+    "image_url":  {"type":"image","required":true},
+    "brand_color":{"type":"color","required":false,"default":"#0fbf91"},
+    "badge_text": {"type":"text","required":false,"default":"NEW"},
+    "cta_text":   {"type":"text","required":false,"default":"Shop now"},
+    "cta_url":    {"type":"url","required":false},
+    "logo":       {"type":"image","required":false}
+  },
+  "render": {
+    "selectors": {
+      "title": "#title",
+      "price": "#price",
+      "image": "#productImage",
+      "badge": "#badgeText",
+      "cta":   "#ctaText",
+      "brand": "#brandAccent",
+      "logo":  "#brandLogo"
+    }
+  }
+}
