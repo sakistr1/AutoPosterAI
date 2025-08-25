@@ -1,38 +1,49 @@
+from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
-from database import get_db
-from schemas import UserCreate, UserOut
+from sqlalchemy.orm import Session
+from passlib.context import CryptContext
+
+# ίδια Session / User με την app
+from database import SessionLocal
 from models.user import User
-from services.auth import create_access_token, get_password_hash, verify_password
+
+# ΠΟΛΥ ΣΗΜΑΝΤΙΚΟ: ίδιο module με τα υπόλοιπα endpoints
+from token_module import create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 
 router = APIRouter()
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
-@router.post("/register", response_model=UserOut)
-def register(user_create: UserCreate, db: Session = Depends(get_db)):
-    existing_user = db.query(User).filter(User.email == user_create.email).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+def verify_password(plain: str, hashed: str) -> bool:
+    try:
+        return pwd_context.verify(plain, hashed)
+    except Exception:
+        return False
 
-    hashed_password = get_password_hash(user_create.password)
-    new_user = User(
-        email=user_create.email,
-        username=user_create.username,
-        hashed_password=hashed_password  # Διόρθωση εδώ
+def _auth_core(db: Session, username: str, password: str) -> dict:
+    user = db.query(User).filter((User.email == username) | (User.username == username)).first()
+    if not user or not verify_password(password, user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+
+    token = create_access_token(
+        {"sub": user.email},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    return new_user
-
+    # γύρνα "Bearer" (κεφαλαίο Β) για να είμαστε safe με client-side
+    return {"access_token": token, "token_type": "Bearer"}
 
 @router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == form_data.username).first()
+    return _auth_core(db, form_data.username, form_data.password)
 
-    if not user or not verify_password(form_data.password, user.hashed_password):  # Διόρθωση εδώ
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-
-    token = create_access_token({"sub": user.email})
-    return {"access_token": token, "token_type": "bearer"}
+@router.post("/token")
+def token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    # OAuth2 password grant συμβατό
+    return _auth_core(db, form_data.username, form_data.password)
