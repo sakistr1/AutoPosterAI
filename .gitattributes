@@ -1,2 +1,4 @@
 snapshots/*.tar.gz.gpg filter=lfs diff=lfs merge=lfs -text
-*.png filter=lfs diff=lfs merge=lfs -text
+templates_images/5392890.png filter=lfs diff=lfs merge=lfs -text
+templates_images/5776709.png filter=lfs diff=lfs merge=lfs -text
+templates_images/5889745.png filter=lfs diff=lfs merge=lfs -text
