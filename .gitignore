@@ -55,3 +55,9 @@ run_*
 
 # --- PAGES ΠΟΥ ΔΕ ΘΕΣ ΝΑ TRACKΑΡΕΙΣ ---
 static/posts.html
+
+# --- BULK helpers (τοπικά εργαλεία) ---
+bulk*.sh
+bulk*.json
+sa
+os
