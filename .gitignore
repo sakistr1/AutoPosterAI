@@ -53,3 +53,13 @@ requirements.txt.bak
 backups/
 /final_*.svg
 /post_*.png
+
+# Generated/outputs
+output/
+post_generator/
+production_engine/static/mock_previews/
+production_engine/static/uploads/
+static/ads/
+out_pngs/
+stripe_*.tar.gz
+models/stripe_*.tar.gz
