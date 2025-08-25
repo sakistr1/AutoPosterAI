@@ -1,3 +1,49 @@
+# --- RUNTIME / GENERATED ---
+static/generated/
+production_engine/static/generated/
+static/uploads/
+production_engine/static/uploads/
+production_engine/static/mock_previews/
+output/
+post_generator/
+out_pngs/
+static/ads/
+**/tmp_*.png
+
+# --- DATA & BACKUPS ---
+backups/
+*.db
+autoposter.db
+test.db
+production_engine/engine.db
+*.jsonl
+resp_preview.json
+preview.json
+commit.json
+p.json
+body.json
+c.json
+server.log
+smoke_*.log
+
+# --- ENV / CACHES ---
+.venv/
+venv/
+.env
+__pycache__/
+*/__pycache__/
+*.pyc
+*.log
+
+# --- VENDOR BLOBS ---
+stripe_*.tar.gz
+models/stripe_*.tar.gz
+
+# --- LOCAL REVIEW/RUN DIRS ---
+review_*/
+run_*/
+review_*
+run_*
 
 # --- DEV LEFTOVERS / EDITOR BACKUPS ---
 *.bak
@@ -7,13 +53,5 @@
 *.swo
 *.tmp
 
-# --- LOCAL TOOLS / SCRIPTS / BACKUPS ---
-backups/
-bulk*.sh
-bulk*.json
-*.jsonl
-sa
-os
-
-# --- PAGES YOU ΔΕΝ ΘΕΛΕΙΣ ΝΑ TRACKAREIS ---
+# --- PAGES ΠΟΥ ΔΕ ΘΕΣ ΝΑ TRACKΑΡΕΙΣ ---
 static/posts.html
