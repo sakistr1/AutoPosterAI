@@ -63,3 +63,31 @@ static/ads/
 out_pngs/
 stripe_*.tar.gz
 models/stripe_*.tar.gz
+
+# --- GENERATED / RUNTIME ---
+static/generated/
+production_engine/static/generated/
+static/uploads/
+production_engine/static/uploads/
+production_engine/static/mock_previews/
+output/
+post_generator/
+out_pngs/
+static/ads/
+**/tmp_*.png
+
+# env / caches / DB
+venv/
+.env
+__pycache__/
+*.pyc
+*.log
+*.db
+
+# vendor tarballs
+stripe_*.tar.gz
+models/stripe_*.tar.gz
+
+# local review/run dirs
+review_*/
+run_*/
