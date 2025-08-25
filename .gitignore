@@ -1,0 +1,19 @@
+
+# --- DEV LEFTOVERS / EDITOR BACKUPS ---
+*.bak
+*.orig
+*.rej
+*.swp
+*.swo
+*.tmp
+
+# --- LOCAL TOOLS / SCRIPTS / BACKUPS ---
+backups/
+bulk*.sh
+bulk*.json
+*.jsonl
+sa
+os
+
+# --- PAGES YOU ΔΕΝ ΘΕΛΕΙΣ ΝΑ TRACKAREIS ---
+static/posts.html
